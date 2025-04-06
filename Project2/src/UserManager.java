@@ -83,7 +83,7 @@ public class UserManager {
 
 	@Override
 	public String toString() {
-		return "ID: " + userID.get() + " - " + name.get();
+		return name.get() + " (ID: " + userID.get() + ")";
 	}
 
 	@Override

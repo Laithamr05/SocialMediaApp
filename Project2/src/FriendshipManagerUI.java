@@ -29,6 +29,19 @@ public class FriendshipManagerUI {
 
         friendshipTable.setPrefHeight(400);
 
+        // Table navigation buttons
+        HBox navButtonBar = new HBox(10);
+        navButtonBar.setAlignment(Pos.CENTER);
+        
+        Button prevButton = new Button("◀ Previous");
+        prevButton.setOnAction(e -> navigateToPreviousFriend());
+        
+        Button nextButton = new Button("Next ▶");
+        nextButton.setOnAction(e -> navigateToNextFriend());
+        
+        navButtonBar.getChildren().addAll(prevButton, nextButton);
+
+        // Main buttons
         HBox buttonBar = new HBox(10);
         buttonBar.setAlignment(Pos.CENTER);
 
@@ -43,7 +56,7 @@ public class FriendshipManagerUI {
 
         buttonBar.getChildren().addAll(addFriendButton, removeFriendButton, uploadFriendshipsButton);
 
-        friendshipContent.getChildren().addAll(friendshipTable, buttonBar);
+        friendshipContent.getChildren().addAll(friendshipTable, navButtonBar, buttonBar);
 
         Tab friendshipTab = new Tab("Friendships", friendshipContent);
         friendshipTab.setClosable(false);
@@ -203,14 +216,11 @@ public class FriendshipManagerUI {
             CircularDoublyLinkedList<UserManager> friendsList = cellData.getValue().getFriends();
             Node<UserManager> current = friendsList.dummy.next;
             
-            System.out.println("Friend list for " + cellData.getValue().getName() + ":");
-            
             while (current != friendsList.dummy) {
                 if (friends.length() > 0) {
                     friends.append(", ");
                 }
                 friends.append(current.data.getName() + " (ID: " + current.data.getUserID() + ")");
-                System.out.println("- " + current.data.getName() + " (ID: " + current.data.getUserID() + ")");
                 current = current.next;
             }
             
@@ -260,10 +270,39 @@ public class FriendshipManagerUI {
         }
         friendshipTable.setItems(userList);
         friendshipTable.refresh();
-        System.out.println("Updated friendship table with " + userList.size() + " users");
     }
 
     public TableView<UserManager> getFriendshipTable() {
         return friendshipTable;
+    }
+
+    /**
+     * Navigate to the previous friend in the table
+     */
+    private void navigateToPreviousFriend() {
+        int currentIndex = friendshipTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex > 0) {
+            friendshipTable.getSelectionModel().select(currentIndex - 1);
+            friendshipTable.scrollTo(currentIndex - 1);
+        } else if (friendshipTable.getItems().size() > 0) {
+            // Wrap around to the last item
+            friendshipTable.getSelectionModel().select(friendshipTable.getItems().size() - 1);
+            friendshipTable.scrollTo(friendshipTable.getItems().size() - 1);
+        }
+    }
+    
+    /**
+     * Navigate to the next friend in the table
+     */
+    private void navigateToNextFriend() {
+        int currentIndex = friendshipTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex < friendshipTable.getItems().size() - 1) {
+            friendshipTable.getSelectionModel().select(currentIndex + 1);
+            friendshipTable.scrollTo(currentIndex + 1);
+        } else if (friendshipTable.getItems().size() > 0) {
+            // Wrap around to the first item
+            friendshipTable.getSelectionModel().select(0);
+            friendshipTable.scrollTo(0);
+        }
     }
 } 

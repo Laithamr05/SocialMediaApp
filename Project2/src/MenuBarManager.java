@@ -25,8 +25,14 @@ public class MenuBarManager {
 
         MenuItem postsItem = new MenuItem("Posts");
         postsItem.setOnAction(e -> tabPane.getSelectionModel().select(2));
+        
+        MenuItem friendshipItem = new MenuItem("Friendship");
+        friendshipItem.setOnAction(e -> tabPane.getSelectionModel().select(3));
+        
+        MenuItem reportsItem = new MenuItem("Reports & Statistics");
+        reportsItem.setOnAction(e -> tabPane.getSelectionModel().select(4));
 
-        viewMenu.getItems().addAll(welcomeItem, usersItem, postsItem);
+        viewMenu.getItems().addAll(welcomeItem, usersItem, postsItem, friendshipItem, reportsItem);
 
         Menu userMenu = new Menu("User Management");
         MenuItem addUserItem = new MenuItem("Add User");
@@ -36,9 +42,32 @@ public class MenuBarManager {
         editUserItem.setOnAction(e -> showEditUserDialog());
 
         userMenu.getItems().addAll(addUserItem, editUserItem);
+        
+        Menu reportMenu = new Menu("Reports");
+        MenuItem postsCreatedItem = new MenuItem("Posts Created by User");
+        postsCreatedItem.setOnAction(e -> {
+            tabPane.getSelectionModel().select(4); // Select the Reports tab
+        });
+        
+        MenuItem postsSharedItem = new MenuItem("Posts Shared with User");
+        postsSharedItem.setOnAction(e -> {
+            tabPane.getSelectionModel().select(4); // Select the Reports tab
+        });
+        
+        MenuItem mostActiveItem = new MenuItem("Most Active Users");
+        mostActiveItem.setOnAction(e -> {
+            tabPane.getSelectionModel().select(4); // Select the Reports tab
+        });
+        
+        MenuItem engagementItem = new MenuItem("User Engagement Metrics");
+        engagementItem.setOnAction(e -> {
+            tabPane.getSelectionModel().select(4); // Select the Reports tab
+        });
+        
+        reportMenu.getItems().addAll(postsCreatedItem, postsSharedItem, mostActiveItem, engagementItem);
 
         MenuBar menuBar = new MenuBar();
-        menuBar.getMenus().addAll(fileMenu, viewMenu, userMenu);
+        menuBar.getMenus().addAll(fileMenu, viewMenu, userMenu, reportMenu);
         return menuBar;
     }
 

@@ -28,6 +28,7 @@ public class GUI extends Application {
     private UserManagerUI userManagerUI;
     private PostManagerUI postManagerUI;
     private FriendshipManagerUI friendshipManagerUI;
+    private ReportManagerUI reportManagerUI;
     private WelcomePage welcomePage;
     private TabPane tabPane;
     private BorderPane mainLayout;
@@ -49,6 +50,7 @@ public class GUI extends Application {
         userManagerUI = new UserManagerUI(users, fileManager, welcomePage);
         postManagerUI = new PostManagerUI(posts, fileManager, users, welcomePage);
         friendshipManagerUI = new FriendshipManagerUI(users, fileManager);
+        reportManagerUI = new ReportManagerUI(users, posts);
 
         Tab welcomeTab = new Tab("Welcome", welcomePage.createWelcomePage());
         welcomeTab.setClosable(false);
@@ -59,6 +61,9 @@ public class GUI extends Application {
         tabPane.getTabs().add(postManagerUI.createPostTab());
 
         tabPane.getTabs().add(friendshipManagerUI.createFriendshipTab());
+        
+        // Add the Reports & Statistics tab
+        tabPane.getTabs().add(reportManagerUI.createReportsTab());
 
         mainLayout.setCenter(tabPane);
 
@@ -116,7 +121,7 @@ public class GUI extends Application {
         try {
             welcomeImage.setImage(new Image(new File("src/facebook.png").toURI().toString()));
         } catch (Exception e) {
-            System.out.println("Error loading image: " + e.getMessage());
+            // Error loading image silently ignored
         }
         welcomeImage.setFitWidth(400);
         welcomeImage.setFitHeight(300);
@@ -596,10 +601,7 @@ public class GUI extends Application {
         File selectedFile = fileChooser.showOpenDialog(null);
         
         if (selectedFile != null) {
-            System.out.println("Selected file: " + selectedFile.getAbsolutePath());
-            System.out.println("Current posts before upload: " + posts.size());
             fileManager.readPosts(selectedFile.getAbsolutePath(), posts, users);
-            System.out.println("Posts after upload: " + posts.size());
             updatePostTable();
         }
     }
@@ -615,7 +617,6 @@ public class GUI extends Application {
     }
 
     private void updatePostTable() {
-        System.out.println("Updating post table...");
         ObservableList<PostManager> postList = FXCollections.observableArrayList();
         Node<PostManager> current = posts.dummy.next;
         int count = 0;
@@ -624,13 +625,7 @@ public class GUI extends Application {
             current = current.next;
             count++;
         }
-        System.out.println("Posts to display: " + count);
         postManagerUI.getPostTable().setItems(postList);
         postManagerUI.getPostTable().refresh();
-        
-        System.out.println("Table items: " + postManagerUI.getPostTable().getItems().size());
-        for (PostManager post : postManagerUI.getPostTable().getItems()) {
-            System.out.println("Post in table: " + post.getPostID() + " - " + post.getContent());
-        }
     }
 }

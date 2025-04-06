@@ -9,12 +9,14 @@ import javafx.geometry.Pos;
 import javafx.beans.property.SimpleStringProperty;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.Comparator;
 
 public class UserManagerUI {
     private TableView<UserManager> userTable;
     private CircularDoublyLinkedList<UserManager> users;
     private FileManager fileManager;
     private WelcomePage welcomePage;
+    private ComboBox<String> sortOrderComboBox;
 
     public UserManagerUI(CircularDoublyLinkedList<UserManager> users, FileManager fileManager, WelcomePage welcomePage) {
         this.users = users;
@@ -29,6 +31,19 @@ public class UserManagerUI {
 
         userTable.setPrefHeight(400);
 
+        // Table navigation buttons
+        HBox navButtonBar = new HBox(10);
+        navButtonBar.setAlignment(Pos.CENTER);
+        
+        Button prevButton = new Button("◀ Previous");
+        prevButton.setOnAction(e -> navigateToPreviousUser());
+        
+        Button nextButton = new Button("Next ▶");
+        nextButton.setOnAction(e -> navigateToNextUser());
+        
+        navButtonBar.getChildren().addAll(prevButton, nextButton);
+
+        // Main buttons
         HBox buttonBar = new HBox(10);
         buttonBar.setAlignment(Pos.CENTER);
 
@@ -38,12 +53,38 @@ public class UserManagerUI {
         Button editUserButton = new Button("Edit User");
         editUserButton.setOnAction(e -> showEditUserDialog());
 
+        Button deleteUserButton = new Button("Delete User");
+        deleteUserButton.setOnAction(e -> deleteSelectedUser());
+
         Button uploadUserButton = new Button("Upload Users");
         uploadUserButton.setOnAction(e -> handleUserFileUpload());
 
-        buttonBar.getChildren().addAll(addUserButton, editUserButton, uploadUserButton);
+        buttonBar.getChildren().addAll(addUserButton, editUserButton, deleteUserButton, uploadUserButton);
 
-        userContent.getChildren().addAll(userTable, buttonBar);
+        // Save data section
+        HBox saveDataBar = new HBox(10);
+        saveDataBar.setAlignment(Pos.CENTER);
+        saveDataBar.setPadding(new Insets(10, 0, 0, 0));
+        
+        Label sortLabel = new Label("Sort Order:");
+        sortOrderComboBox = new ComboBox<>();
+        sortOrderComboBox.getItems().addAll("Unsorted", "Ascending by Username", "Descending by Username");
+        sortOrderComboBox.setValue("Unsorted");
+        sortOrderComboBox.setPrefWidth(180);
+        
+        Button saveUsersButton = new Button("Save Users");
+        saveUsersButton.setOnAction(e -> saveUsers());
+        
+        Button savePostsButton = new Button("Save Posts");
+        savePostsButton.setOnAction(e -> savePosts());
+        
+        Button saveFriendshipsButton = new Button("Save Friendships");
+        saveFriendshipsButton.setOnAction(e -> saveFriendships());
+        
+        saveDataBar.getChildren().addAll(sortLabel, sortOrderComboBox, saveUsersButton, 
+                                        savePostsButton, saveFriendshipsButton);
+
+        userContent.getChildren().addAll(userTable, navButtonBar, buttonBar, new Separator(), saveDataBar);
 
         Tab userTab = new Tab("Users", userContent);
         userTab.setClosable(false);
@@ -266,5 +307,199 @@ public class UserManagerUI {
 
     public TableView<UserManager> getUserTable() {
         return userTable;
+    }
+
+    /**
+     * Navigate to the previous user in the table
+     */
+    private void navigateToPreviousUser() {
+        int currentIndex = userTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex > 0) {
+            userTable.getSelectionModel().select(currentIndex - 1);
+            userTable.scrollTo(currentIndex - 1);
+        } else if (userTable.getItems().size() > 0) {
+            // Wrap around to the last item
+            userTable.getSelectionModel().select(userTable.getItems().size() - 1);
+            userTable.scrollTo(userTable.getItems().size() - 1);
+        }
+    }
+    
+    /**
+     * Navigate to the next user in the table
+     */
+    private void navigateToNextUser() {
+        int currentIndex = userTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex < userTable.getItems().size() - 1) {
+            userTable.getSelectionModel().select(currentIndex + 1);
+            userTable.scrollTo(currentIndex + 1);
+        } else if (userTable.getItems().size() > 0) {
+            // Wrap around to the first item
+            userTable.getSelectionModel().select(0);
+            userTable.scrollTo(0);
+        }
+    }
+
+    /**
+     * Deletes the currently selected user from the system
+     */
+    private void deleteSelectedUser() {
+        UserManager selectedUser = userTable.getSelectionModel().getSelectedItem();
+        if (selectedUser == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Selection");
+            alert.setHeaderText("No User Selected");
+            alert.setContentText("Please select a user to delete.");
+            alert.showAndWait();
+            return;
+        }
+        
+        // Confirm deletion
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Confirm Deletion");
+        confirmAlert.setHeaderText("Delete User: " + selectedUser.getName());
+        confirmAlert.setContentText("Are you sure you want to delete this user? This action cannot be undone.");
+        
+        if (confirmAlert.showAndWait().get() == ButtonType.OK) {
+            // Remove the user from the circular linked list
+            users.delete(selectedUser);
+            
+            // Update the table view
+            updateUserTable();
+            
+            // Show success message
+            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+            successAlert.setTitle("User Deleted");
+            successAlert.setHeaderText(null);
+            successAlert.setContentText("User " + selectedUser.getName() + " has been successfully deleted.");
+            successAlert.showAndWait();
+        }
+    }
+
+    /**
+     * Save users to a file with selected sort order
+     */
+    private void saveUsers() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Users Data");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Text Files", "*.txt"));
+        fileChooser.setInitialFileName("updated_users.txt");
+        
+        File file = fileChooser.showSaveDialog(null);
+        if (file != null) {
+            try {
+                // Get sorted or unsorted list based on selection
+                ObservableList<UserManager> userList = getUsersWithSortOrder();
+                
+                // Save the list to file
+                fileManager.saveUsers(file.getAbsolutePath(), userList);
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText("Data Saved");
+                alert.setContentText("Users data has been successfully saved to " + file.getName());
+                alert.showAndWait();
+            } catch (Exception e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Save Failed");
+                alert.setContentText("Error saving the data: " + e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    /**
+     * Save posts to a file
+     */
+    private void savePosts() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Posts Data");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Text Files", "*.txt"));
+        fileChooser.setInitialFileName("updated_posts.txt");
+        
+        File file = fileChooser.showSaveDialog(null);
+        if (file != null) {
+            try {
+                // Get the posts associated with the application
+                CircularDoublyLinkedList<PostManager> posts = welcomePage.getPosts();
+                
+                // Save the posts with user order consideration
+                fileManager.savePosts(file.getAbsolutePath(), posts, getUsersWithSortOrder());
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText("Data Saved");
+                alert.setContentText("Posts data has been successfully saved to " + file.getName());
+                alert.showAndWait();
+            } catch (Exception e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Save Failed");
+                alert.setContentText("Error saving the data: " + e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    /**
+     * Save friendships to a file
+     */
+    private void saveFriendships() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Friendships Data");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Text Files", "*.txt"));
+        fileChooser.setInitialFileName("updated_friendships.txt");
+        
+        File file = fileChooser.showSaveDialog(null);
+        if (file != null) {
+            try {
+                // Get ordered users list based on selection
+                ObservableList<UserManager> userList = getUsersWithSortOrder();
+                
+                // Save friendship data
+                fileManager.saveFriendships(file.getAbsolutePath(), userList);
+                
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Success");
+                alert.setHeaderText("Data Saved");
+                alert.setContentText("Friendships data has been successfully saved to " + file.getName());
+                alert.showAndWait();
+            } catch (Exception e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error");
+                alert.setHeaderText("Save Failed");
+                alert.setContentText("Error saving the data: " + e.getMessage());
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    /**
+     * Get users list with the selected sort order applied
+     * @return ObservableList of users with sort order applied
+     */
+    private ObservableList<UserManager> getUsersWithSortOrder() {
+        // Convert linked list to observable list
+        ObservableList<UserManager> userList = FXCollections.observableArrayList();
+        Node<UserManager> current = users.dummy.next;
+        while (current != users.dummy) {
+            userList.add(current.data);
+            current = current.next;
+        }
+        
+        // Apply sorting based on combobox selection
+        String sortSelection = sortOrderComboBox.getValue();
+        
+        if (sortSelection.equals("Ascending by Username")) {
+            userList.sort(Comparator.comparing(UserManager::getName));
+        } else if (sortSelection.equals("Descending by Username")) {
+            userList.sort(Comparator.comparing(UserManager::getName).reversed());
+        }
+        // "Unsorted" option - do nothing, keep original order
+        
+        return userList;
     }
 } 

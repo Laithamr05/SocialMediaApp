@@ -16,10 +16,12 @@ import javafx.scene.paint.Color;
 public class WelcomePage {
 	private TabPane tabPane;
 	private CircularDoublyLinkedList<UserManager> users;
+	private CircularDoublyLinkedList<PostManager> posts;
 
 	public WelcomePage(TabPane tabPane) {
 		this.tabPane = tabPane;
 		this.users = new CircularDoublyLinkedList<>();
+		this.posts = new CircularDoublyLinkedList<>();
 	}
 
 	public VBox createWelcomePage() {
@@ -35,7 +37,7 @@ public class WelcomePage {
 			logoView.setFitHeight(200);
 			logoView.setPreserveRatio(true);
 		} catch (Exception e) {
-			System.out.println("Error loading logo: " + e.getMessage());
+			// Error loading logo - silently ignored
 		}
 
 		Label welcomeLabel = new Label("Welcome to Palestine Social Network");
@@ -65,7 +67,14 @@ public class WelcomePage {
 			}
 		});
 		
-		buttonBox.getChildren().addAll(usersButton, postsButton, friendsButton);
+		Button reportsButton = new Button("Reports & Statistics");
+		reportsButton.setOnAction(e -> {
+			if (tabPane != null) {
+				tabPane.getSelectionModel().select(4);
+			}
+		});
+		
+		buttonBox.getChildren().addAll(usersButton, postsButton, friendsButton, reportsButton);
 
 		welcomeContent.getChildren().addAll(logoView, welcomeLabel, buttonBox);
 
@@ -74,6 +83,18 @@ public class WelcomePage {
 
 	public void setUsers(CircularDoublyLinkedList<UserManager> users) {
 		this.users = users;
+	}
+
+	public CircularDoublyLinkedList<UserManager> getUsers() {
+		return users;
+	}
+
+	public void setPosts(CircularDoublyLinkedList<PostManager> posts) {
+		this.posts = posts;
+	}
+
+	public CircularDoublyLinkedList<PostManager> getPosts() {
+		return posts;
 	}
 
 	public Tab createWelcomeTab() {
@@ -89,7 +110,7 @@ public class WelcomePage {
 			
 			welcomeContent.getChildren().add(logoView);
 		} catch (Exception e) {
-			System.out.println("Failed to load logo: " + e.getMessage());
+			// Failed to load logo - silently ignored
 		}
 		
 		Text welcomeText = new Text("Welcome to Palestine Social Network");

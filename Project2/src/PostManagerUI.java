@@ -31,6 +31,19 @@ public class PostManagerUI {
 
         postTable.setPrefHeight(400);
 
+        // Table navigation buttons
+        HBox navButtonBar = new HBox(10);
+        navButtonBar.setAlignment(Pos.CENTER);
+        
+        Button prevButton = new Button("◀ Previous");
+        prevButton.setOnAction(e -> navigateToPreviousPost());
+        
+        Button nextButton = new Button("Next ▶");
+        nextButton.setOnAction(e -> navigateToNextPost());
+        
+        navButtonBar.getChildren().addAll(prevButton, nextButton);
+
+        // Main buttons
         HBox buttonBar = new HBox(10);
         buttonBar.setAlignment(Pos.CENTER);
 
@@ -42,7 +55,7 @@ public class PostManagerUI {
 
         buttonBar.getChildren().addAll(createPostButton, uploadPostButton);
 
-        postContent.getChildren().addAll(postTable, buttonBar);
+        postContent.getChildren().addAll(postTable, navButtonBar, buttonBar);
 
         Tab postTab = new Tab("Posts", postContent);
         postTab.setClosable(false);
@@ -177,5 +190,35 @@ public class PostManagerUI {
 
     public TableView<PostManager> getPostTable() {
         return postTable;
+    }
+
+    /**
+     * Navigate to the previous post in the table
+     */
+    private void navigateToPreviousPost() {
+        int currentIndex = postTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex > 0) {
+            postTable.getSelectionModel().select(currentIndex - 1);
+            postTable.scrollTo(currentIndex - 1);
+        } else if (postTable.getItems().size() > 0) {
+            // Wrap around to the last item
+            postTable.getSelectionModel().select(postTable.getItems().size() - 1);
+            postTable.scrollTo(postTable.getItems().size() - 1);
+        }
+    }
+    
+    /**
+     * Navigate to the next post in the table
+     */
+    private void navigateToNextPost() {
+        int currentIndex = postTable.getSelectionModel().getSelectedIndex();
+        if (currentIndex < postTable.getItems().size() - 1) {
+            postTable.getSelectionModel().select(currentIndex + 1);
+            postTable.scrollTo(currentIndex + 1);
+        } else if (postTable.getItems().size() > 0) {
+            // Wrap around to the first item
+            postTable.getSelectionModel().select(0);
+            postTable.scrollTo(0);
+        }
     }
 } 

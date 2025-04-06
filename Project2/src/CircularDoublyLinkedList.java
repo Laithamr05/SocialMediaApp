@@ -33,7 +33,7 @@ public class CircularDoublyLinkedList<T> {
 
 	public void insertMiddle(T node, T data) {
 		if (!contains(node)) {
-			System.out.println("Node not found.");
+			// Node not found - silently return
 			return;
 		}
 
@@ -58,17 +58,16 @@ public class CircularDoublyLinkedList<T> {
 	public void display() {
 		int count = 1;
 		if (dummy == null || dummy.next == dummy) {
-			System.out.println("List is Empty");
+			// List is empty - silently return
 			return;
 		}
 		Node<T> current = dummy.next;
 
 		while (current != dummy) {
-			System.out.println(count + ". " + current.data);
+			// Output removed
 			current = current.next;
 			count++;
 		}
-
 	}
 
 	public boolean deleteAll() {
@@ -86,7 +85,7 @@ public class CircularDoublyLinkedList<T> {
 
 	public void delete(T data) {
 		if (!contains(data)) {
-			System.out.println("Node not found");
+			// Node not found - silently return
 			return;
 		}
 
@@ -129,13 +128,13 @@ public class CircularDoublyLinkedList<T> {
 		bubbleSort();
 		int count = 1;
 		if (dummy == null || dummy.next == dummy) {
-			System.out.println("List is Empty");
+			// List is empty - silently return
 			return;
 		}
 		Node<T> current = dummy.next;
 
 		while (current != dummy) {
-			System.out.println(count + ". " + current.data);
+			// Output removed
 			current = current.next;
 			count++;
 		}

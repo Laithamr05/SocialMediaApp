@@ -10,12 +10,6 @@ public class PostCreator {
 				newPost.shareWithAllFriends();
 			}
 
-			else {
-				if (sharedWith.size() == 0) {
-					System.out.println("No users to share with.");
-				}
-			}
-
 			return newPost;
 		}
 	}
