@@ -74,7 +74,14 @@ public class WelcomePage {
 			}
 		});
 		
-		buttonBox.getChildren().addAll(usersButton, postsButton, friendsButton, reportsButton);
+		Button dataManagementButton = new Button("Data Management");
+		dataManagementButton.setOnAction(e -> {
+			if (tabPane != null) {
+				tabPane.getSelectionModel().select(5);
+			}
+		});
+		
+		buttonBox.getChildren().addAll(usersButton, postsButton, friendsButton, reportsButton, dataManagementButton);
 
 		welcomeContent.getChildren().addAll(logoView, welcomeLabel, buttonBox);
 
@@ -125,5 +132,9 @@ public class WelcomePage {
 		Tab welcomeTab = new Tab("Welcome", welcomeContent);
 		welcomeTab.setClosable(false);
 		return welcomeTab;
+	}
+
+	public TabPane getTabPane() {
+		return tabPane;
 	}
 }

@@ -31,8 +31,11 @@ public class MenuBarManager {
         
         MenuItem reportsItem = new MenuItem("Reports & Statistics");
         reportsItem.setOnAction(e -> tabPane.getSelectionModel().select(4));
+        
+        MenuItem dataManagementItem = new MenuItem("Data Management");
+        dataManagementItem.setOnAction(e -> tabPane.getSelectionModel().select(5));
 
-        viewMenu.getItems().addAll(welcomeItem, usersItem, postsItem, friendshipItem, reportsItem);
+        viewMenu.getItems().addAll(welcomeItem, usersItem, postsItem, friendshipItem, reportsItem, dataManagementItem);
 
         Menu userMenu = new Menu("User Management");
         MenuItem addUserItem = new MenuItem("Add User");

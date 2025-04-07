@@ -29,6 +29,7 @@ public class GUI extends Application {
     private PostManagerUI postManagerUI;
     private FriendshipManagerUI friendshipManagerUI;
     private ReportManagerUI reportManagerUI;
+    private DataManagementUI dataManagementUI;
     private WelcomePage welcomePage;
     private TabPane tabPane;
     private BorderPane mainLayout;
@@ -47,23 +48,22 @@ public class GUI extends Application {
 
         welcomePage = new WelcomePage(tabPane);
         welcomePage.setUsers(users);
+        welcomePage.setPosts(posts);
         userManagerUI = new UserManagerUI(users, fileManager, welcomePage);
         postManagerUI = new PostManagerUI(posts, fileManager, users, welcomePage);
         friendshipManagerUI = new FriendshipManagerUI(users, fileManager);
         reportManagerUI = new ReportManagerUI(users, posts);
+        dataManagementUI = new DataManagementUI(users, posts, fileManager);
 
         Tab welcomeTab = new Tab("Welcome", welcomePage.createWelcomePage());
         welcomeTab.setClosable(false);
         tabPane.getTabs().add(welcomeTab);
 
         tabPane.getTabs().add(userManagerUI.createUserTab());
-
         tabPane.getTabs().add(postManagerUI.createPostTab());
-
         tabPane.getTabs().add(friendshipManagerUI.createFriendshipTab());
-        
-        // Add the Reports & Statistics tab
         tabPane.getTabs().add(reportManagerUI.createReportsTab());
+        tabPane.getTabs().add(dataManagementUI.createDataManagementTab());
 
         mainLayout.setCenter(tabPane);
 

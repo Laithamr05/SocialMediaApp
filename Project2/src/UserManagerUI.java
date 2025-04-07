@@ -209,62 +209,58 @@ public class UserManagerUI {
         grid.setPadding(new Insets(20, 150, 10, 10));
 
         TextField nameField = new TextField(selectedUser.getName());
-        
-        int age = Integer.parseInt(selectedUser.getAge());
-        LocalDate birthDate = LocalDate.now().minusYears(age);
-        
-        DatePicker birthDatePicker = new DatePicker(birthDate);
+        TextField ageField = new TextField(selectedUser.getAge());
 
         grid.add(new Label("Name:"), 0, 0);
         grid.add(nameField, 1, 0);
-        grid.add(new Label("Birth Date:"), 0, 1);
-        grid.add(birthDatePicker, 1, 1);
+        grid.add(new Label("Age:"), 0, 1);
+        grid.add(ageField, 1, 1);
 
         dialog.getDialogPane().setContent(grid);
 
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == saveButtonType) {
-                if (nameField.getText().isEmpty() || birthDatePicker.getValue() == null) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Input");
-                    alert.setContentText("Please fill in all fields.");
-                    alert.showAndWait();
-                    return null;
-                }
-
-                LocalDate newBirthDate = birthDatePicker.getValue();
-                LocalDate now = LocalDate.now();
-
-                if (newBirthDate.isAfter(now)) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Birth Date");
-                    alert.setContentText("Birth date cannot be in the future.");
-                    alert.showAndWait();
-                    return null;
-                }
-
-                int newAge = Period.between(newBirthDate, now).getYears();
-
-                if (newAge < 16) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Age");
-                    alert.setContentText("User must be at least 16 years old.");
-                    alert.showAndWait();
-                    return null;
-                }
-
                 selectedUser.setName(nameField.getText());
-                selectedUser.setAge(String.valueOf(newAge));
-                updateUserTable();
+                selectedUser.setAge(ageField.getText());
                 return selectedUser;
             }
             return null;
         });
 
-        dialog.showAndWait();
+        dialog.showAndWait().ifPresent(user -> {
+            // Show confirmation dialog
+            Alert confirmAlert = new Alert(Alert.AlertType.INFORMATION);
+            confirmAlert.setTitle("Success");
+            confirmAlert.setHeaderText("User Updated");
+            confirmAlert.setContentText("User " + user.getName() + " has been successfully updated.");
+            confirmAlert.showAndWait();
+            
+            // Update tables
+            userTable.refresh();
+            // Update friendship table if it exists
+            if (welcomePage != null) {
+                TabPane tabPane = welcomePage.getTabPane();
+                if (tabPane != null) {
+                    for (Tab tab : tabPane.getTabs()) {
+                        if (tab.getText().equals("Friendships")) {
+                            javafx.scene.Node content = tab.getContent();
+                            if (content instanceof VBox) {
+                                VBox vbox = (VBox) content;
+                                for (javafx.scene.Node node : vbox.getChildren()) {
+                                    if (node instanceof TableView<?>) {
+                                        @SuppressWarnings("unchecked")
+                                        TableView<UserManager> friendshipTable = (TableView<UserManager>) node;
+                                        friendshipTable.refresh();
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        });
     }
 
     private void handleUserFileUpload() {

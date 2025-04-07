@@ -11,11 +11,16 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.util.Pair;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 public class FriendshipManagerUI {
     private TableView<UserManager> friendshipTable;
     private CircularDoublyLinkedList<UserManager> users;
     private FileManager fileManager;
+    private ComboBox<String> sortOrderComboBox;
+    private ComboBox<UserManager> userComboBox;
 
     public FriendshipManagerUI(CircularDoublyLinkedList<UserManager> users, FileManager fileManager) {
         this.users = users;
@@ -28,6 +33,24 @@ public class FriendshipManagerUI {
         friendshipContent.setPadding(new Insets(20));
 
         friendshipTable.setPrefHeight(400);
+
+        // User selection and sorting controls
+        HBox controlsBox = new HBox(10);
+        controlsBox.setAlignment(Pos.CENTER);
+        
+        Label userLabel = new Label("Select User:");
+        userComboBox = new ComboBox<>();
+        userComboBox.setPrefWidth(200);
+        userComboBox.setOnAction(e -> updateFriendshipDisplay());
+        
+        Label sortLabel = new Label("Sort Order:");
+        sortOrderComboBox = new ComboBox<>();
+        sortOrderComboBox.getItems().addAll("Unsorted", "Ascending by Username", "Descending by Username");
+        sortOrderComboBox.setValue("Unsorted");
+        sortOrderComboBox.setPrefWidth(200);
+        sortOrderComboBox.setOnAction(e -> updateFriendshipDisplay());
+        
+        controlsBox.getChildren().addAll(userLabel, userComboBox, sortLabel, sortOrderComboBox);
 
         // Table navigation buttons
         HBox navButtonBar = new HBox(10);
@@ -56,11 +79,75 @@ public class FriendshipManagerUI {
 
         buttonBar.getChildren().addAll(addFriendButton, removeFriendButton, uploadFriendshipsButton);
 
-        friendshipContent.getChildren().addAll(friendshipTable, navButtonBar, buttonBar);
+        friendshipContent.getChildren().addAll(controlsBox, friendshipTable, navButtonBar, buttonBar);
 
         Tab friendshipTab = new Tab("Friendships", friendshipContent);
         friendshipTab.setClosable(false);
+        
+        // Add listener to update user list when tab is selected
+        friendshipTab.setOnSelectionChanged(e -> {
+            if (friendshipTab.isSelected()) {
+                updateUserComboBox();
+            }
+        });
+        
         return friendshipTab;
+    }
+
+    private void updateUserComboBox() {
+        ObservableList<UserManager> userList = FXCollections.observableArrayList();
+        Node<UserManager> current = users.dummy.next;
+        while (current != users.dummy) {
+            userList.add(current.data);
+            current = current.next;
+        }
+        userComboBox.setItems(userList);
+    }
+
+    private void updateFriendshipDisplay() {
+        UserManager selectedUser = userComboBox.getValue();
+        if (selectedUser == null) {
+            return;
+        }
+
+        // Get friends list
+        List<UserManager> friends = new ArrayList<>();
+        CircularDoublyLinkedList<UserManager> friendsList = selectedUser.getFriends();
+        if (friendsList != null) {
+            Node<UserManager> current = friendsList.dummy.next;
+            while (current != friendsList.dummy) {
+                friends.add(current.data);
+                current = current.next;
+            }
+        }
+
+        // Sort based on selected order
+        String sortOrder = sortOrderComboBox.getValue();
+        if (sortOrder.equals("Ascending by Username")) {
+            friends.sort(Comparator.comparing(UserManager::getName));
+        } else if (sortOrder.equals("Descending by Username")) {
+            friends.sort(Comparator.comparing(UserManager::getName).reversed());
+        }
+
+        // Show summary in dialog
+        StringBuilder summary = new StringBuilder();
+        if (friends.isEmpty()) {
+            summary.append("No friends found.");
+        } else {
+            for (int i = 0; i < friends.size(); i++) {
+                summary.append(friends.get(i).getName());
+                if (i < friends.size() - 1) {
+                    summary.append("\n");
+                }
+            }
+        }
+        
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Friends List");
+        alert.setHeaderText("Friends of " + selectedUser.getName());
+        alert.setContentText(summary.toString());
+        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+        alert.showAndWait();
     }
 
     private void showAddFriendDialog() {
@@ -214,20 +301,17 @@ public class FriendshipManagerUI {
         friendsColumn.setCellValueFactory(cellData -> {
             StringBuilder friends = new StringBuilder();
             CircularDoublyLinkedList<UserManager> friendsList = cellData.getValue().getFriends();
-            Node<UserManager> current = friendsList.dummy.next;
-            
-            while (current != friendsList.dummy) {
-                if (friends.length() > 0) {
-                    friends.append(", ");
+            if (friendsList != null) {
+                Node<UserManager> current = friendsList.dummy.next;
+                while (current != friendsList.dummy) {
+                    if (friends.length() > 0) {
+                        friends.append(", ");
+                    }
+                    friends.append(current.data.getName());
+                    current = current.next;
                 }
-                friends.append(current.data.getName() + " (ID: " + current.data.getUserID() + ")");
-                current = current.next;
             }
-            
-            if (friends.length() == 0) {
-                return new SimpleStringProperty("No friends");
-            }
-            return new SimpleStringProperty(friends.toString());
+            return new SimpleStringProperty(friends.length() > 0 ? friends.toString() : "No friends");
         });
         friendsColumn.setPrefWidth(300);
 

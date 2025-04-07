@@ -88,8 +88,10 @@ public class UserManager {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj) return true;
-		if (obj == null || getClass() != obj.getClass()) return false;
+		if (this == obj)
+			return true;
+		if (obj == null || getClass() != obj.getClass())
+			return false;
 		UserManager other = (UserManager) obj;
 		return userID.get().equals(other.userID.get());
 	}
