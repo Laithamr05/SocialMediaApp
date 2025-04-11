@@ -1,15 +1,22 @@
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
-import java.io.File;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.beans.property.SimpleStringProperty;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.stage.Window;
+import javafx.stage.WindowEvent;
+
+import java.io.File;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 
 public class UserManagerUI {
     private TableView<UserManager> userTable;
@@ -22,69 +29,83 @@ public class UserManagerUI {
         this.users = users;
         this.fileManager = fileManager;
         this.welcomePage = welcomePage;
-        this.userTable = createUserTable();
+        this.userTable = new TableView<>();
     }
 
     public Tab createUserTab() {
-        VBox userContent = new VBox(10);
+        VBox userContent = new VBox(20);
         userContent.setPadding(new Insets(20));
+        userContent.setAlignment(Pos.CENTER);
 
+        userTable = new TableView<>();
         userTable.setPrefHeight(400);
+        userTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
 
-        // Table navigation buttons
-        HBox navButtonBar = new HBox(10);
-        navButtonBar.setAlignment(Pos.CENTER);
+        TableColumn<UserManager, String> idColumn = new TableColumn<>("User ID");
+        idColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getUserID()) : new SimpleStringProperty("");
+        });
+        idColumn.setPrefWidth(100);
         
+        idColumn.setComparator((id1, id2) -> {
+            try {
+                return Integer.compare(Integer.parseInt(id1), Integer.parseInt(id2));
+            } catch (NumberFormatException e) {
+                return id1.compareTo(id2);
+            }
+        });
+
+        TableColumn<UserManager, String> nameColumn = new TableColumn<>("Name");
+        nameColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getName()) : new SimpleStringProperty("");
+        });
+        nameColumn.setPrefWidth(200);
+
+        TableColumn<UserManager, String> ageColumn = new TableColumn<>("Age");
+        ageColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getAge()) : new SimpleStringProperty("");
+        });
+        ageColumn.setPrefWidth(100);
+
+        userTable.getColumns().addAll(idColumn, nameColumn, ageColumn);
+
+        userTable.setPlaceholder(new Label("No content in table"));
+
+        refreshUserTable();
+
+        HBox tableNavBox = new HBox(10);
+        tableNavBox.setAlignment(Pos.CENTER);
         Button prevButton = new Button("◀ Previous");
+        prevButton.setPrefWidth(100);
         prevButton.setOnAction(e -> navigateToPreviousUser());
-        
         Button nextButton = new Button("Next ▶");
+        nextButton.setPrefWidth(100);
         nextButton.setOnAction(e -> navigateToNextUser());
-        
-        navButtonBar.getChildren().addAll(prevButton, nextButton);
+        tableNavBox.getChildren().addAll(prevButton, nextButton);
 
-        // Main buttons
-        HBox buttonBar = new HBox(10);
-        buttonBar.setAlignment(Pos.CENTER);
-
+        HBox actionButtonsBox = new HBox(10);
+        actionButtonsBox.setAlignment(Pos.CENTER);
         Button addUserButton = new Button("Add User");
+        addUserButton.setPrefWidth(100);
         addUserButton.setOnAction(e -> showAddUserDialog());
-
         Button editUserButton = new Button("Edit User");
+        editUserButton.setPrefWidth(100);
         editUserButton.setOnAction(e -> showEditUserDialog());
-
         Button deleteUserButton = new Button("Delete User");
+        deleteUserButton.setPrefWidth(100);
         deleteUserButton.setOnAction(e -> deleteSelectedUser());
+        Button uploadUsersButton = new Button("Upload Users");
+        uploadUsersButton.setPrefWidth(100);
+        uploadUsersButton.setOnAction(e -> {
+            handleUserFileUpload();
+            refreshUserTable();
+        });
+        actionButtonsBox.getChildren().addAll(addUserButton, editUserButton, deleteUserButton, uploadUsersButton);
 
-        Button uploadUserButton = new Button("Upload Users");
-        uploadUserButton.setOnAction(e -> handleUserFileUpload());
-
-        buttonBar.getChildren().addAll(addUserButton, editUserButton, deleteUserButton, uploadUserButton);
-
-        // Save data section
-        HBox saveDataBar = new HBox(10);
-        saveDataBar.setAlignment(Pos.CENTER);
-        saveDataBar.setPadding(new Insets(10, 0, 0, 0));
-        
-        Label sortLabel = new Label("Sort Order:");
-        sortOrderComboBox = new ComboBox<>();
-        sortOrderComboBox.getItems().addAll("Unsorted", "Ascending by Username", "Descending by Username");
-        sortOrderComboBox.setValue("Unsorted");
-        sortOrderComboBox.setPrefWidth(180);
-        
-        Button saveUsersButton = new Button("Save Users");
-        saveUsersButton.setOnAction(e -> saveUsers());
-        
-        Button savePostsButton = new Button("Save Posts");
-        savePostsButton.setOnAction(e -> savePosts());
-        
-        Button saveFriendshipsButton = new Button("Save Friendships");
-        saveFriendshipsButton.setOnAction(e -> saveFriendships());
-        
-        saveDataBar.getChildren().addAll(sortLabel, sortOrderComboBox, saveUsersButton, 
-                                        savePostsButton, saveFriendshipsButton);
-
-        userContent.getChildren().addAll(userTable, navButtonBar, buttonBar, new Separator(), saveDataBar);
+        userContent.getChildren().addAll(userTable, tableNavBox, actionButtonsBox);
 
         Tab userTab = new Tab("Users", userContent);
         userTab.setClosable(false);
@@ -93,21 +114,32 @@ public class UserManagerUI {
 
     private TableView<UserManager> createUserTable() {
         TableView<UserManager> table = new TableView<>();
-        table.setPrefHeight(400);
-
+        
         TableColumn<UserManager, String> idColumn = new TableColumn<>("User ID");
-        idColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getUserID()));
+        idColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getUserID()) : new SimpleStringProperty("");
+        });
         idColumn.setPrefWidth(100);
-
+        
         TableColumn<UserManager, String> nameColumn = new TableColumn<>("Name");
-        nameColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getName()));
+        nameColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getName()) : new SimpleStringProperty("");
+        });
         nameColumn.setPrefWidth(200);
-
+        
         TableColumn<UserManager, String> ageColumn = new TableColumn<>("Age");
-        ageColumn.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getAge()));
+        ageColumn.setCellValueFactory(cellData -> {
+            UserManager user = cellData.getValue();
+            return user != null ? new SimpleStringProperty(user.getAge()) : new SimpleStringProperty("");
+        });
         ageColumn.setPrefWidth(100);
-
+        
         table.getColumns().addAll(idColumn, nameColumn, ageColumn);
+        
+        refreshUserTable();
+        
         return table;
     }
 
@@ -129,6 +161,15 @@ public class UserManagerUI {
 
         DatePicker birthDatePicker = new DatePicker();
         birthDatePicker.setPromptText("Birth Date");
+        
+        birthDatePicker.setDayCellFactory(picker -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
+                LocalDate today = LocalDate.now();
+                setDisable(empty || date.isAfter(today));
+            }
+        });
 
         grid.add(new Label("Name:"), 0, 0);
         grid.add(nameField, 1, 0);
@@ -148,36 +189,37 @@ public class UserManagerUI {
                     return null;
                 }
 
-                LocalDate birthDate = birthDatePicker.getValue();
-                LocalDate now = LocalDate.now();
-                int age = Period.between(birthDate, now).getYears();
+                try {
+                    LocalDate birthDate = birthDatePicker.getValue();
+                    LocalDate now = LocalDate.now();
+                    
+                    int age = Period.between(birthDate, now).getYears();
+                    
+                    if (age < 16) {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Invalid Age");
+                        alert.setContentText("User must be at least 16 years old.");
+                        alert.showAndWait();
+                        return null;
+                    }
 
-                if (birthDate.isAfter(now)) {
+                    String newID = String.valueOf(users.size() + 1);
+                    String name = nameField.getText();
+                    String ageStr = String.valueOf(age);
+
+                    UserManager newUser = new UserManager(newID, name, ageStr);
+                    users.insertLast(newUser);
+                    updateUserTable();
+                    return newUser;
+                } catch (Exception e) {
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Birth Date");
-                    alert.setContentText("Birth date cannot be in the future.");
+                    alert.setHeaderText("Invalid Input");
+                    alert.setContentText("Please enter valid information: " + e.getMessage());
                     alert.showAndWait();
                     return null;
                 }
-
-                if (age < 16) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Age");
-                    alert.setContentText("User must be at least 16 years old.");
-                    alert.showAndWait();
-                    return null;
-                }
-
-                String newID = String.valueOf(users.size() + 1);
-                String name = nameField.getText();
-                String ageStr = String.valueOf(age);
-
-                UserManager newUser = new UserManager(newID, name, ageStr);
-                users.insertLast(newUser);
-                updateUserTable();
-                return newUser;
             }
             return null;
         });
@@ -209,46 +251,94 @@ public class UserManagerUI {
         grid.setPadding(new Insets(20, 150, 10, 10));
 
         TextField nameField = new TextField(selectedUser.getName());
-        TextField ageField = new TextField(selectedUser.getAge());
+        
+        DatePicker birthDatePicker = new DatePicker();
+        birthDatePicker.setPromptText("Birth Date");
+        
+        int currentAge = Integer.parseInt(selectedUser.getAge());
+        LocalDate approximateBirthDate = LocalDate.now().minusYears(currentAge);
+        birthDatePicker.setValue(approximateBirthDate);
+        
+        birthDatePicker.setDayCellFactory(picker -> new DateCell() {
+            @Override
+            public void updateItem(LocalDate date, boolean empty) {
+                super.updateItem(date, empty);
+                LocalDate today = LocalDate.now();
+                setDisable(empty || date.isAfter(today));
+            }
+        });
 
         grid.add(new Label("Name:"), 0, 0);
         grid.add(nameField, 1, 0);
-        grid.add(new Label("Age:"), 0, 1);
-        grid.add(ageField, 1, 1);
+        grid.add(new Label("Birth Date:"), 0, 1);
+        grid.add(birthDatePicker, 1, 1);
 
         dialog.getDialogPane().setContent(grid);
 
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == saveButtonType) {
-                selectedUser.setName(nameField.getText());
-                selectedUser.setAge(ageField.getText());
-                return selectedUser;
+                if (nameField.getText().isEmpty() || birthDatePicker.getValue() == null) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText("Invalid Input");
+                    alert.setContentText("Please fill in all fields.");
+                    alert.showAndWait();
+                    return null;
+                }
+                
+                try {
+                    LocalDate birthDate = birthDatePicker.getValue();
+                    LocalDate now = LocalDate.now();
+                    
+                    int age = Period.between(birthDate, now).getYears();
+                    
+                    if (age < 16) {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Invalid Age");
+                        alert.setContentText("User must be at least 16 years old.");
+                        alert.showAndWait();
+                        return null;
+                    }
+                
+                    selectedUser.setName(nameField.getText());
+                    selectedUser.setAge(String.valueOf(age));
+                    return selectedUser;
+                } catch (Exception e) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText("Invalid Input");
+                    alert.setContentText("Please enter valid information: " + e.getMessage());
+                    alert.showAndWait();
+                    return null;
+                }
             }
             return null;
         });
 
         dialog.showAndWait().ifPresent(user -> {
-            // Show confirmation dialog
             Alert confirmAlert = new Alert(Alert.AlertType.INFORMATION);
             confirmAlert.setTitle("Success");
             confirmAlert.setHeaderText("User Updated");
             confirmAlert.setContentText("User " + user.getName() + " has been successfully updated.");
             confirmAlert.showAndWait();
             
-            // Update tables
             userTable.refresh();
-            // Update friendship table if it exists
+            
             if (welcomePage != null) {
                 TabPane tabPane = welcomePage.getTabPane();
                 if (tabPane != null) {
-                    for (Tab tab : tabPane.getTabs()) {
+                    int tabCount = tabPane.getTabs().size();
+                    for (int i = 0; i < tabCount; i++) {
+                        Tab tab = tabPane.getTabs().get(i);
                         if (tab.getText().equals("Friendships")) {
                             javafx.scene.Node content = tab.getContent();
                             if (content instanceof VBox) {
                                 VBox vbox = (VBox) content;
-                                for (javafx.scene.Node node : vbox.getChildren()) {
-                                    if (node instanceof TableView<?>) {
-                                        @SuppressWarnings("unchecked")
+                                int childCount = vbox.getChildren().size();
+                                for (int j = 0; j < childCount; j++) {
+                                    javafx.scene.Node node = vbox.getChildren().get(j);
+                                    if (node instanceof TableView) {
                                         TableView<UserManager> friendshipTable = (TableView<UserManager>) node;
                                         friendshipTable.refresh();
                                         break;
@@ -272,12 +362,21 @@ public class UserManagerUI {
 
         if (selectedFile != null) {
             try {
-                fileManager.readUsers(selectedFile.getAbsolutePath(), users);
+                fileManager.loadUsers(selectedFile.getAbsolutePath(), users);
+                
+                int renamedUsers = removeDuplicateUsers();
+                
                 updateUserTable();
+                
+                String successMessage = "Users have been successfully uploaded from the file.";
+                if (renamedUsers > 0) {
+                    successMessage += "\nAssigned new IDs to " + renamedUsers + " duplicate user(s).";
+                }
+                
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
                 alert.setTitle("Success");
                 alert.setHeaderText("File Uploaded");
-                alert.setContentText("Users have been successfully uploaded from the file.");
+                alert.setContentText(successMessage);
                 alert.showAndWait();
             } catch (Exception e) {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -288,56 +387,93 @@ public class UserManagerUI {
             }
         }
     }
+    
+    private int removeDuplicateUsers() {
+        int duplicatesRenamed = 0;
+        
+        java.util.ArrayList<String> seenUserIds = new java.util.ArrayList<String>();
+        java.util.ArrayList<UserManager> usersToRename = new java.util.ArrayList<UserManager>();
+        
+        Iterator<UserManager> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            UserManager user = iterator.next();
+            if (user != null) {
+                String userId = user.getUserID();
+                
+                if (seenUserIds.contains(userId)) {
+                    usersToRename.add(user);
+                    duplicatesRenamed++;
+                } else {
+                    seenUserIds.add(userId);
+                }
+            }
+        }
+        
+        int highestId = 0;
+        iterator = users.iterator();
+        while (iterator.hasNext()) {
+            UserManager user = iterator.next();
+            if (user != null) {
+                try {
+                    int id = Integer.parseInt(user.getUserID());
+                    if (id > highestId) {
+                        highestId = id;
+                    }
+                } catch (NumberFormatException e) {
+                }
+            }
+        }
+        
+        for (int i = 0; i < usersToRename.size(); i++) {
+            UserManager userToRename = usersToRename.get(i);
+            String newId = String.valueOf(highestId + i + 1);
+            
+            userToRename.setUserID(newId);
+            
+            seenUserIds.add(newId);
+        }
+        
+        return duplicatesRenamed;
+    }
 
     public void updateUserTable() {
         ObservableList<UserManager> userList = FXCollections.observableArrayList();
-        Node<UserManager> current = users.dummy.next;
-        while (current != users.dummy) {
-            userList.add(current.data);
-            current = current.next;
-        }
-        userTable.setItems(userList);
         
-       
+        Iterator<UserManager> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            UserManager user = iterator.next();
+            userList.add(user);
+        }
+        
+        userTable.setItems(userList);
     }
 
     public TableView<UserManager> getUserTable() {
         return userTable;
     }
 
-    /**
-     * Navigate to the previous user in the table
-     */
     private void navigateToPreviousUser() {
         int currentIndex = userTable.getSelectionModel().getSelectedIndex();
         if (currentIndex > 0) {
             userTable.getSelectionModel().select(currentIndex - 1);
             userTable.scrollTo(currentIndex - 1);
         } else if (userTable.getItems().size() > 0) {
-            // Wrap around to the last item
             userTable.getSelectionModel().select(userTable.getItems().size() - 1);
             userTable.scrollTo(userTable.getItems().size() - 1);
         }
     }
     
-    /**
-     * Navigate to the next user in the table
-     */
     private void navigateToNextUser() {
         int currentIndex = userTable.getSelectionModel().getSelectedIndex();
         if (currentIndex < userTable.getItems().size() - 1) {
             userTable.getSelectionModel().select(currentIndex + 1);
             userTable.scrollTo(currentIndex + 1);
         } else if (userTable.getItems().size() > 0) {
-            // Wrap around to the first item
             userTable.getSelectionModel().select(0);
             userTable.scrollTo(0);
         }
     }
 
-    /**
-     * Deletes the currently selected user from the system
-     */
     private void deleteSelectedUser() {
         UserManager selectedUser = userTable.getSelectionModel().getSelectedItem();
         if (selectedUser == null) {
@@ -349,20 +485,16 @@ public class UserManagerUI {
             return;
         }
         
-        // Confirm deletion
         Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
         confirmAlert.setTitle("Confirm Deletion");
         confirmAlert.setHeaderText("Delete User: " + selectedUser.getName());
         confirmAlert.setContentText("Are you sure you want to delete this user? This action cannot be undone.");
         
         if (confirmAlert.showAndWait().get() == ButtonType.OK) {
-            // Remove the user from the circular linked list
             users.delete(selectedUser);
             
-            // Update the table view
             updateUserTable();
             
-            // Show success message
             Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
             successAlert.setTitle("User Deleted");
             successAlert.setHeaderText(null);
@@ -371,9 +503,6 @@ public class UserManagerUI {
         }
     }
 
-    /**
-     * Save users to a file with selected sort order
-     */
     private void saveUsers() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Save Users Data");
@@ -384,10 +513,8 @@ public class UserManagerUI {
         File file = fileChooser.showSaveDialog(null);
         if (file != null) {
             try {
-                // Get sorted or unsorted list based on selection
                 ObservableList<UserManager> userList = getUsersWithSortOrder();
                 
-                // Save the list to file
                 fileManager.saveUsers(file.getAbsolutePath(), userList);
                 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -405,9 +532,6 @@ public class UserManagerUI {
         }
     }
     
-    /**
-     * Save posts to a file
-     */
     private void savePosts() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Save Posts Data");
@@ -418,10 +542,8 @@ public class UserManagerUI {
         File file = fileChooser.showSaveDialog(null);
         if (file != null) {
             try {
-                // Get the posts associated with the application
                 CircularDoublyLinkedList<PostManager> posts = welcomePage.getPosts();
                 
-                // Save the posts with user order consideration
                 fileManager.savePosts(file.getAbsolutePath(), posts, getUsersWithSortOrder());
                 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -439,9 +561,6 @@ public class UserManagerUI {
         }
     }
     
-    /**
-     * Save friendships to a file
-     */
     private void saveFriendships() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Save Friendships Data");
@@ -452,10 +571,8 @@ public class UserManagerUI {
         File file = fileChooser.showSaveDialog(null);
         if (file != null) {
             try {
-                // Get ordered users list based on selection
                 ObservableList<UserManager> userList = getUsersWithSortOrder();
                 
-                // Save friendship data
                 fileManager.saveFriendships(file.getAbsolutePath(), userList);
                 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -473,29 +590,42 @@ public class UserManagerUI {
         }
     }
     
-    /**
-     * Get users list with the selected sort order applied
-     * @return ObservableList of users with sort order applied
-     */
     private ObservableList<UserManager> getUsersWithSortOrder() {
-        // Convert linked list to observable list
         ObservableList<UserManager> userList = FXCollections.observableArrayList();
-        Node<UserManager> current = users.dummy.next;
-        while (current != users.dummy) {
-            userList.add(current.data);
-            current = current.next;
+        
+        Iterator<UserManager> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            UserManager user = iterator.next();
+            userList.add(user);
         }
         
-        // Apply sorting based on combobox selection
         String sortSelection = sortOrderComboBox.getValue();
         
         if (sortSelection.equals("Ascending by Username")) {
-            userList.sort(Comparator.comparing(UserManager::getName));
+            Collections.sort(userList, new Comparator<UserManager>() {
+                @Override
+                public int compare(UserManager u1, UserManager u2) {
+                    return u1.getName().compareTo(u2.getName());
+                }
+            });
         } else if (sortSelection.equals("Descending by Username")) {
-            userList.sort(Comparator.comparing(UserManager::getName).reversed());
+            Collections.sort(userList, new Comparator<UserManager>() {
+                @Override
+                public int compare(UserManager u1, UserManager u2) {
+                    return u2.getName().compareTo(u1.getName());
+                }
+            });
         }
-        // "Unsorted" option - do nothing, keep original order
         
         return userList;
+    }
+
+    private void refreshUserTable() {
+        ObservableList<UserManager> userList = FXCollections.observableArrayList();
+        Iterator<UserManager> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            userList.add(iterator.next());
+        }
+        userTable.setItems(userList);
     }
 } 

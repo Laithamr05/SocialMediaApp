@@ -11,7 +11,7 @@ public class MenuBarManager {
     }
 
     public MenuBar createMenuBar() {
-        Menu fileMenu = new Menu("File");
+        Menu fileMenu = new Menu("Exit");
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.setOnAction(e -> System.exit(0));
         fileMenu.getItems().add(exitItem);
@@ -37,46 +37,8 @@ public class MenuBarManager {
 
         viewMenu.getItems().addAll(welcomeItem, usersItem, postsItem, friendshipItem, reportsItem, dataManagementItem);
 
-        Menu userMenu = new Menu("User Management");
-        MenuItem addUserItem = new MenuItem("Add User");
-        addUserItem.setOnAction(e -> showAddUserDialog());
-
-        MenuItem editUserItem = new MenuItem("Edit User");
-        editUserItem.setOnAction(e -> showEditUserDialog());
-
-        userMenu.getItems().addAll(addUserItem, editUserItem);
-        
-        Menu reportMenu = new Menu("Reports");
-        MenuItem postsCreatedItem = new MenuItem("Posts Created by User");
-        postsCreatedItem.setOnAction(e -> {
-            tabPane.getSelectionModel().select(4); // Select the Reports tab
-        });
-        
-        MenuItem postsSharedItem = new MenuItem("Posts Shared with User");
-        postsSharedItem.setOnAction(e -> {
-            tabPane.getSelectionModel().select(4); // Select the Reports tab
-        });
-        
-        MenuItem mostActiveItem = new MenuItem("Most Active Users");
-        mostActiveItem.setOnAction(e -> {
-            tabPane.getSelectionModel().select(4); // Select the Reports tab
-        });
-        
-        MenuItem engagementItem = new MenuItem("User Engagement Metrics");
-        engagementItem.setOnAction(e -> {
-            tabPane.getSelectionModel().select(4); // Select the Reports tab
-        });
-        
-        reportMenu.getItems().addAll(postsCreatedItem, postsSharedItem, mostActiveItem, engagementItem);
-
         MenuBar menuBar = new MenuBar();
-        menuBar.getMenus().addAll(fileMenu, viewMenu, userMenu, reportMenu);
+        menuBar.getMenus().addAll(fileMenu, viewMenu);
         return menuBar;
-    }
-
-    private void showAddUserDialog() {
-    }
-
-    private void showEditUserDialog() {
     }
 } 

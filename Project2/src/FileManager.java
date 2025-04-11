@@ -1,49 +1,54 @@
 import java.io.*;
-import java.time.LocalDate;
 import java.util.Arrays;
 import javafx.collections.ObservableList;
+import java.util.Iterator;
+import java.util.Calendar;
+import javafx.scene.control.Alert;
+import javafx.collections.FXCollections;
+import java.util.Collections;
+import java.util.List;
+import java.util.ArrayList;
 
 public class FileManager {
-	public void readUsers(String filePath, CircularDoublyLinkedList<UserManager> users) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+	public void loadUsers(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
+		try (BufferedReader fileReader = new BufferedReader(new FileReader(filePath))) {
 			String line;
-			while ((line = reader.readLine()) != null) {
-				String[] parts = line.split(",");
-				if (parts.length >= 3) {
-					String id = parts[0].trim();
-					String name = parts[1].trim();
-					String age = parts[2].trim();
-					users.insertLast(new UserManager(id, name, age));
+			while ((line = fileReader.readLine()) != null) {
+				String[] fields = line.split(",");
+				if (fields.length >= 3) {
+					String id = fields[0].trim();
+					String name = fields[1].trim();
+					String age = fields[2].trim();
+					userDb.insertLast(new UserManager(id, name, age));
 				}
 			}
 		} catch (IOException e) {
-			// Handle exception silently
 		}
 	}
 
-	public void readFriendships(String filePath, CircularDoublyLinkedList<UserManager> users) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+	public void loadFriendships(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
+		try (BufferedReader fileReader = new BufferedReader(new FileReader(filePath))) {
 			String line;
-			while ((line = reader.readLine()) != null) {
-				String[] parts = line.split(",");
-				if (parts.length >= 2) {
-					String userId = parts[0].trim();
-					UserManager user = findUserById(users, userId);
+			while ((line = fileReader.readLine()) != null) {
+				String[] fields = line.split(",");
+				if (fields.length >= 2) {
+					String userId = fields[0].trim();
+					UserManager owner = lookupUserById(userDb, userId);
 					
-					if (user != null) {
-						user.setFriends(new CircularDoublyLinkedList<>());
+					if (owner != null) {
+						owner.setFriends(new CircularDoublyLinkedList<>());
 						
-						for (int i = 1; i < parts.length; i++) {
-							String friendId = parts[i].trim();
-							UserManager friend = findUserById(users, friendId);
+						for (int i = 1; i < fields.length; i++) {
+							String friendId = fields[i].trim();
+							UserManager friend = lookupUserById(userDb, friendId);
 							
-							if (friend != null && !user.equals(friend)) {
-								if (!user.contains(friend)) {
-									user.addFriend(friend);
+							if (friend != null && !owner.equals(friend)) {
+								if (!owner.contains(friend)) {
+									owner.addFriend(friend);
 								}
 								
-								if (!friend.contains(user)) {
-									friend.addFriend(user);
+								if (!friend.contains(owner)) {
+									friend.addFriend(owner);
 								}
 							}
 						}
@@ -51,64 +56,60 @@ public class FileManager {
 				}
 			}
 		} catch (IOException e) {
-			// Handle exception silently
 		}
 	}
 
-	public void readPosts(String filePath, CircularDoublyLinkedList<PostManager> posts, CircularDoublyLinkedList<UserManager> users) {
-		try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+	public void loadPosts(String filePath, CircularDoublyLinkedList<PostManager> postDb, CircularDoublyLinkedList<UserManager> userDb) {
+		try (BufferedReader fileReader = new BufferedReader(new FileReader(filePath))) {
 			String line;
-			while ((line = reader.readLine()) != null) {
-				processPostLine(line, posts, users);
+			while ((line = fileReader.readLine()) != null) {
+				processPostRecord(line, postDb, userDb);
 			}
 		} catch (IOException e) {
-			// Handle exception silently
 		}
 	}
 	
-	private void processPostLine(String line, CircularDoublyLinkedList<PostManager> posts, CircularDoublyLinkedList<UserManager> users) {
-		String[] parts = line.split(",");
-		if (parts.length >= 4) {
-			String postId = parts[0].trim();
-			String creatorId = parts[1].trim();
-			String content = parts[2].trim();
-			String dateStr = parts[3].trim();
+	public void processPostRecord(String line, CircularDoublyLinkedList<PostManager> postDb, CircularDoublyLinkedList<UserManager> userDb) {
+		String[] fields = line.split(",");
+		if (fields.length >= 4) {
+			String postID = fields[0];
+			String creatorID = fields[1];
+			String content = fields[2];
+			String dateStr = fields[3];
 			
-			LocalDate date;
-			try {
-				String[] dateParts = dateStr.split("\\.");
-				if (dateParts.length == 3) {
-					int day = Integer.parseInt(dateParts[0]);
-					int month = Integer.parseInt(dateParts[1]);
-					int year = Integer.parseInt(dateParts[2]);
-					date = LocalDate.of(year, month, day);
-				} else {
-					date = LocalDate.parse(dateStr);
-				}
-			} catch (Exception e) {
-				date = LocalDate.now();
-			}
+			UserManager creator = lookupUserById(userDb, creatorID);
 			
-			UserManager creator = findUserById(users, creatorId);
 			if (creator != null) {
-				PostManager post = new PostManager(postId, creator, content, date);
+				Calendar date = Calendar.getInstance();
+				try {
+					String[] dateParts = dateStr.split("\\.");
+					if (dateParts.length == 3) {
+						int day = Integer.parseInt(dateParts[0]);
+						int month = Integer.parseInt(dateParts[1]) - 1;
+						int year = Integer.parseInt(dateParts[2]);
+						date.set(year, month, day);
+					}
+				} catch (NumberFormatException e) {
+					System.err.println("Error parsing date: " + dateStr);
+				}
 				
-				for (int i = 4; i < parts.length; i++) {
-					String userId = parts[i].trim();
-					UserManager sharedUser = findUserById(users, userId);
+				PostManager post = new PostManager(postID, creator, content, date);
+				
+				for (int i = 4; i < fields.length; i++) {
+					UserManager sharedUser = lookupUserById(userDb, fields[i]);
 					if (sharedUser != null) {
 						post.addSharedUser(sharedUser);
 					}
 				}
 				
-				posts.insertLast(post);
+				postDb.insertLast(post);
 			}
 		}
 	}
 
-	private UserManager findUserById(CircularDoublyLinkedList<UserManager> users, String id) {
-		Node<UserManager> current = users.dummy.next;
-		while (current != users.dummy) {
+	public UserManager lookupUserById(CircularDoublyLinkedList<UserManager> userDb, String id) {
+		Node<UserManager> current = userDb.dummy.next;
+		while (current != userDb.dummy) {
 			if (current.data.getUserID().equals(id)) {
 				return current.data;
 			}
@@ -117,183 +118,190 @@ public class FileManager {
 		return null;
 	}
 
-	public void writeUsers(String filePath, CircularDoublyLinkedList<UserManager> users) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			Node<UserManager> current = users.dummy.next;
-			while (current != users.dummy) {
-				UserManager user = current.data;
-				writer.println(user.getUserID() + "," + user.getName() + "," + user.getAge());
-				current = current.next;
+	public void storeUsers(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			Iterator<UserManager> iterator = userDb.iterator();
+			while (iterator.hasNext()) {
+				UserManager user = iterator.next();
+				fileWriter.println(user.getUserID() + "," + user.getName());
 			}
 		} catch (IOException e) {
-			// Handle exception silently
+			e.printStackTrace();
 		}
 	}
 
-	public void writeFriendships(String filePath, CircularDoublyLinkedList<UserManager> users) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			Node<UserManager> current = users.dummy.next;
-			while (current != users.dummy) {
-				UserManager user = current.data;
-				StringBuilder friendIds = new StringBuilder();
-				Node<UserManager> friendNode = user.getFriends().dummy.next;
-				while (friendNode != user.getFriends().dummy) {
-					if (friendIds.length() > 0) {
-						friendIds.append(",");
-					}
-					friendIds.append(friendNode.data.getUserID());
-					friendNode = friendNode.next;
+	public void storeFriendships(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			Iterator<UserManager> iterator = userDb.iterator();
+			while (iterator.hasNext()) {
+				UserManager user = iterator.next();
+				CircularDoublyLinkedList<UserManager> friendsList = user.getFriends();
+				Iterator<UserManager> friendIterator = friendsList.iterator();
+				while (friendIterator.hasNext()) {
+					UserManager friend = friendIterator.next();
+					fileWriter.println(user.getUserID() + "," + friend.getUserID());
 				}
-				writer.println(user.getUserID() + "," + friendIds);
-				current = current.next;
 			}
 		} catch (IOException e) {
-			// Handle exception silently
+			e.printStackTrace();
 		}
 	}
 
-	public void writePosts(String filePath, CircularDoublyLinkedList<PostManager> posts) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			Node<PostManager> current = posts.dummy.next;
-			while (current != posts.dummy) {
-				PostManager post = current.data;
-				
-				StringBuilder postLine = new StringBuilder();
-				postLine.append(post.getPostID()).append(",");
-				postLine.append(post.getCreator().getUserID()).append(",");
-				postLine.append(post.getContent()).append(",");
-				
-				LocalDate date = post.getCreationDate();
-				String formattedDate = String.format("%d.%d.%d", date.getDayOfMonth(), date.getMonthValue(), date.getYear());
-				postLine.append(formattedDate);
-				
-				Node<UserManager> sharedNode = post.getSharedUsers().dummy.next;
-				while (sharedNode != post.getSharedUsers().dummy) {
-					postLine.append(",").append(sharedNode.data.getUserID());
-					sharedNode = sharedNode.next;
-				}
-				
-				writer.println(postLine.toString());
-				current = current.next;
+	public void storePosts(String filePath, CircularDoublyLinkedList<PostManager> postDb) {
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			Iterator<PostManager> iterator = postDb.iterator();
+			while (iterator.hasNext()) {
+				PostManager post = iterator.next();
+				writePostEntry(fileWriter, post);
 			}
 		} catch (IOException e) {
-			// Handle exception silently
+			e.printStackTrace();
 		}
 	}
 
-	/**
-	 * Save users data to file, supporting different sort orders
-	 * @param filePath Path to save the file
-	 * @param userList List of users, possibly sorted
-	 */
 	public void saveUsers(String filePath, ObservableList<UserManager> userList) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			for (UserManager user : userList) {
-				writer.println(user.getUserID() + "," + user.getName() + "," + user.getAge());
-			}
-		} catch (IOException e) {
-			throw new RuntimeException("Error saving users: " + e.getMessage());
+		if (userList == null || userList.isEmpty()) {
+			displayMessage("Error", "No users to save");
+			return;
 		}
-	}
 
-	/**
-	 * Save friendships data to file, supporting different sort orders
-	 * @param filePath Path to save the file
-	 * @param userList List of users, possibly sorted
-	 */
-	public void saveFriendships(String filePath, ObservableList<UserManager> userList) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			for (UserManager user : userList) {
-				StringBuilder friendIds = new StringBuilder();
-				CircularDoublyLinkedList<UserManager> friends = user.getFriends();
-				
-				if (friends != null) {
-					Node<UserManager> friendNode = friends.dummy.next;
-					while (friendNode != friends.dummy) {
-						if (friendIds.length() > 0) {
-							friendIds.append(",");
-						}
-						friendIds.append(friendNode.data.getUserID());
-						friendNode = friendNode.next;
-					}
-				}
-				
-				writer.println(user.getUserID() + "," + friendIds);
-			}
-		} catch (IOException e) {
-			throw new RuntimeException("Error saving friendships: " + e.getMessage());
-		}
-	}
-
-	/**
-	 * Save posts data to file, taking into account user sorting
-	 * @param filePath Path to save the file
-	 * @param posts List of posts
-	 * @param userList Sorted list of users to determine post order
-	 */
-	public void savePosts(String filePath, CircularDoublyLinkedList<PostManager> posts, ObservableList<UserManager> userList) {
-		try (PrintWriter writer = new PrintWriter(new FileWriter(filePath))) {
-			// First, save posts by users in the order provided by userList
-			for (UserManager user : userList) {
-				// Find all posts by this user
-				Node<PostManager> current = posts.dummy.next;
-				while (current != posts.dummy) {
-					PostManager post = current.data;
-					if (post.getCreator() != null && post.getCreator().getUserID().equals(user.getUserID())) {
-						writePostToFile(writer, post);
-					}
-					current = current.next;
-				}
-			}
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			fileWriter.println("# Users");
+			fileWriter.println("# Format: user_id,name,age");
 			
-			// Then check if there are any remaining posts (creators not in userList)
-			Node<PostManager> current = posts.dummy.next;
-			while (current != posts.dummy) {
-				PostManager post = current.data;
-				boolean creatorInList = false;
+			for (int i = 0; i < userList.size(); i++) {
+				UserManager user = userList.get(i);
+				if (user != null) {
+					fileWriter.println(user.getUserID() + "," + user.getName() + "," + user.getAge());
+				}
+			}
+
+			fileWriter.println("# Users");
+			fileWriter.println("# Format: user_id,name,age");
+			
+			for (int i = 0; i < userList.size(); i++) {
+				UserManager user = userList.get(i);
+				String line = user.getUserID() + "," + user.getName() + "," + user.getAge();
+				fileWriter.println(line);
+			}
+
+			displayMessage("Success", "Users saved to " + filePath);
+		} catch (IOException e) {
+			displayMessage("Error", "Failed to save users: " + e.getMessage());
+		}
+	}
+
+	public void saveFriendships(String filePath, ObservableList<UserManager> userList) {
+		if (userList == null || userList.isEmpty()) {
+			displayMessage("Error", "No users to save friendships for");
+			return;
+		}
+
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			for (UserManager user : userList) {
+				String line = user.getUserID();
 				
-				if (post.getCreator() != null) {
-					for (UserManager user : userList) {
-						if (user.getUserID().equals(post.getCreator().getUserID())) {
-							creatorInList = true;
-							break;
+				CircularDoublyLinkedList<UserManager> friendsList = user.getFriends();
+				if (friendsList != null && !friendsList.isEmpty()) {
+					Iterator<UserManager> friendIterator = friendsList.iterator();
+					while (friendIterator.hasNext()) {
+						UserManager friend = friendIterator.next();
+						if (friend != null) {
+							line += "," + friend.getUserID();
+						}
+					}
+				}
+				
+				fileWriter.println(line);
+			}
+			displayMessage("Success", "Friendships saved to " + filePath);
+		} catch (IOException e) {
+			displayMessage("Error", "Failed to save friendships: " + e.getMessage());
+		}
+	}
+
+	public void savePosts(String filePath, CircularDoublyLinkedList<PostManager> posts, ObservableList<UserManager> userList) {
+		if (posts == null || posts.isEmpty()) {
+			displayMessage("Error", "No posts to save");
+			return;
+		}
+
+		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
+			List<PostManager> sortedPosts = new ArrayList<PostManager>();
+			Iterator<PostManager> postIterator = posts.iterator();
+			while (postIterator.hasNext()) {
+				sortedPosts.add(postIterator.next());
+			}
+			Collections.sort(sortedPosts, (p1, p2) -> p1.getPostID().compareTo(p2.getPostID()));
+			
+			fileWriter.println("# Posts");
+			fileWriter.println("# Format: post_id,creator_id,content,creation_date,shared_with_ids");
+			
+			for (int i = 0; i < sortedPosts.size(); i++) {
+				PostManager post = sortedPosts.get(i);
+				if (post != null && post.getCreator() != null) {
+					String line = post.getPostID() + "," + post.getCreator().getUserID() + "," + post.getContent() + ",";
+					
+					Calendar date = post.getCreationDate();
+					if (date != null) {
+						line = line + date.get(Calendar.YEAR) + "-" + (date.get(Calendar.MONTH) + 1) + "-" + date.get(Calendar.DAY_OF_MONTH);
+					} else {
+						line = line + "2023-01-01";
+					}
+					
+					line = line + ",";
+					CircularDoublyLinkedList<UserManager> sharedUsers = post.getSharedUsers();
+					if (sharedUsers != null && !sharedUsers.isEmpty()) {
+						boolean isFirst = true;
+						Iterator<UserManager> iterator = sharedUsers.iterator();
+						while (iterator.hasNext()) {
+							UserManager sharedUser = iterator.next();
+							if (!isFirst) {
+								line = line + ";";
+							}
+							line = line + sharedUser.getUserID();
+							isFirst = false;
 						}
 					}
 					
-					if (!creatorInList) {
-						writePostToFile(writer, post);
-					}
+					fileWriter.println(line);
 				}
-				
-				current = current.next;
 			}
+			
+			displayMessage("Success", "Posts saved to " + filePath);
 		} catch (IOException e) {
-			throw new RuntimeException("Error saving posts: " + e.getMessage());
+			displayMessage("Error", "Failed to save posts: " + e.getMessage());
 		}
 	}
 	
-	/**
-	 * Helper method to write a single post to file
-	 */
-	private void writePostToFile(PrintWriter writer, PostManager post) {
-		StringBuilder postLine = new StringBuilder();
-		postLine.append(post.getPostID()).append(",");
-		postLine.append(post.getCreator().getUserID()).append(",");
-		postLine.append(post.getContent()).append(",");
+	public void writePostEntry(PrintWriter fileWriter, PostManager post) {
+		String output = "";
+		output += post.getPostID() + ",";
+		output += post.getCreator().getUserID() + ",";
+		output += post.getContent() + ",";
 		
-		LocalDate date = post.getCreationDate();
-		String formattedDate = String.format("%d.%d.%d", date.getDayOfMonth(), date.getMonthValue(), date.getYear());
-		postLine.append(formattedDate);
+		Calendar date = post.getCreationDate();
+		String dateStr = String.format("%d.%d.%d", 
+				date.get(Calendar.DAY_OF_MONTH),
+				date.get(Calendar.MONTH) + 1,
+				date.get(Calendar.YEAR));
+		output += dateStr;
 		
 		CircularDoublyLinkedList<UserManager> sharedUsers = post.getSharedUsers();
-		if (sharedUsers != null) {
-			Node<UserManager> sharedNode = sharedUsers.dummy.next;
-			while (sharedNode != sharedUsers.dummy) {
-				postLine.append(",").append(sharedNode.data.getUserID());
-				sharedNode = sharedNode.next;
-			}
+		Iterator<UserManager> iterator = sharedUsers.iterator();
+		while (iterator.hasNext()) {
+			UserManager user = iterator.next();
+			output += "," + user.getUserID();
 		}
 		
-		writer.println(postLine.toString());
+		fileWriter.println(output);
+	}
+	
+	public void displayMessage(String title, String message) {
+		Alert popup = new Alert(Alert.AlertType.INFORMATION);
+		popup.setTitle(title);
+		popup.setHeaderText(null);
+		popup.setContentText(message);
+		popup.showAndWait();
 	}
 }

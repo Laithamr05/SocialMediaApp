@@ -1,8 +1,7 @@
 import javafx.beans.property.SimpleStringProperty;
-import java.time.LocalDate;
-import java.time.Period;
 
-public class UserManager {
+
+public class UserManager implements Comparable<UserManager> {
 	private SimpleStringProperty userID;
 	private SimpleStringProperty name;
 	private SimpleStringProperty age;
@@ -12,14 +11,14 @@ public class UserManager {
 		this.userID = new SimpleStringProperty();
 		this.name = new SimpleStringProperty();
 		this.age = new SimpleStringProperty();
-		this.friends = new CircularDoublyLinkedList<>();
+		this.friends = new CircularDoublyLinkedList<UserManager>();
 	}
 
 	public UserManager(String userID, String name, String age) {
 		this.userID = new SimpleStringProperty(userID);
 		this.name = new SimpleStringProperty(name);
 		this.age = new SimpleStringProperty(age);
-		this.friends = new CircularDoublyLinkedList<>();
+		this.friends = new CircularDoublyLinkedList<UserManager>();
 	}
 
 	public String getUserID() {
@@ -93,7 +92,13 @@ public class UserManager {
 		if (obj == null || getClass() != obj.getClass())
 			return false;
 		UserManager other = (UserManager) obj;
-		return userID.get().equals(other.userID.get());
+		String thisID = userID.get();
+		String otherID = other.userID.get();
+		if (thisID == null && otherID == null)
+			return true;
+		if (thisID == null || otherID == null)
+			return false;
+		return thisID.equals(otherID);
 	}
 
 	public boolean isFriend(UserManager user) {
@@ -156,11 +161,23 @@ public class UserManager {
 	public boolean contains(UserManager user) {
 		Node<UserManager> current = friends.dummy.next;
 		while (current != friends.dummy) {
-			if (current.data.getUserID().equals(user.getUserID())) {
+			if (current.data.equals(user)) {
 				return true;
 			}
 			current = current.next;
 		}
 		return false;
+	}
+
+	@Override
+	public int compareTo(UserManager other) {
+		if (this == other) return 0;
+		if (other == null) return 1;
+		String thisName = name.get();
+		String otherName = other.name.get();
+		if (thisName == null && otherName == null) return 0;
+		if (thisName == null) return -1;
+		if (otherName == null) return 1;
+		return thisName.compareToIgnoreCase(otherName);
 	}
 }

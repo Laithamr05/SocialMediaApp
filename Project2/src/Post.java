@@ -1,6 +1,5 @@
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-import java.time.LocalDate;
 
 public class Post {
 	private SimpleStringProperty postID;

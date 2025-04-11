@@ -1,13 +1,14 @@
-public class CircularDoublyLinkedList<T> {
+import java.util.List;
+import java.util.Collections;
+import java.util.ArrayList;
+
+public class CircularDoublyLinkedList<T extends Comparable<T>> {
 	Node<T> dummy;
-	Node head;
-	private int size;
 
 	public CircularDoublyLinkedList() {
 		dummy = new Node<>(null);
 		dummy.next = dummy;
 		dummy.previous = dummy;
-		size = 0;
 	}
 
 	public void add(T data) {
@@ -28,12 +29,10 @@ public class CircularDoublyLinkedList<T> {
 		newNode.next = dummy;
 		dummy.previous.next = newNode;
 		dummy.previous = newNode;
-		size++;
 	}
 
 	public void insertMiddle(T node, T data) {
 		if (!contains(node)) {
-			// Node not found - silently return
 			return;
 		}
 
@@ -52,31 +51,30 @@ public class CircularDoublyLinkedList<T> {
 	}
 
 	public int size() {
-		return size;
+		int count = 0;
+		Node<T> current = dummy.next;
+		while (current != dummy) {
+			count++;
+			current = current.next;
+		}
+		return count;
 	}
 
 	public void display() {
-		int count = 1;
-		if (dummy == null || dummy.next == dummy) {
-			// List is empty - silently return
-			return;
-		}
 		Node<T> current = dummy.next;
-
 		while (current != dummy) {
-			// Output removed
+			System.out.println(current.data);
 			current = current.next;
-			count++;
 		}
 	}
 
 	public boolean deleteAll() {
-
 		Node<T> current = dummy.next;
 		while (current != dummy) {
-			dummy.next = null;
-			dummy.previous = null;
-			current = current.next;
+			Node<T> next = current.next;
+			current.next = null;
+			current.previous = null;
+			current = next;
 		}
 		dummy.next = dummy;
 		dummy.previous = dummy;
@@ -85,7 +83,6 @@ public class CircularDoublyLinkedList<T> {
 
 	public void delete(T data) {
 		if (!contains(data)) {
-			// Node not found - silently return
 			return;
 		}
 
@@ -102,49 +99,21 @@ public class CircularDoublyLinkedList<T> {
 		}
 	}
 
-	public void bubbleSort() {
-		if (dummy.next == dummy || dummy.next.next == dummy) {
-			return;
-		}
-
-		boolean swapped;
-		do {
-			swapped = false;
-			Node<T> current = dummy.next;
-
-			while (current.next != dummy) {
-				if (((Comparable<T>) current.data).compareTo(current.next.data) > 0) {
-					T temp = current.data;
-					current.data = current.next.data;
-					current.next.data = temp;
-					swapped = true;
-				}
-				current = current.next;
-			}
-		} while (swapped);
-	}
-
 	public void displaySorted() {
-		bubbleSort();
-		int count = 1;
-		if (dummy == null || dummy.next == dummy) {
-			// List is empty - silently return
-			return;
-		}
+		List<T> list = new ArrayList<T>();
 		Node<T> current = dummy.next;
-
 		while (current != dummy) {
-			// Output removed
+			list.add(current.data);
 			current = current.next;
-			count++;
+		}
+		Collections.sort(list);
+		for (int i = 0; i < list.size(); i++) {
+			T item = list.get(i);
+			System.out.println(item);
 		}
 	}
 
 	public boolean contains(T data) {
-		if (size() == 0) {
-			return false;
-		}
-
 		Node<T> current = dummy.next;
 		while (current != dummy) {
 			if (current.data.equals(data)) {
@@ -156,12 +125,15 @@ public class CircularDoublyLinkedList<T> {
 	}
 
 	public boolean isEmpty() {
-		return size == 0;
+		return dummy.next == dummy;
 	}
 
 	public void clear() {
 		dummy.next = dummy;
 		dummy.previous = dummy;
-		size = 0;
+	}
+
+	public java.util.Iterator<T> iterator() {
+		return new CircularDoublyLinkedListIterator<>(dummy);
 	}
 }
