@@ -1,13 +1,15 @@
-import java.io.*;
-import java.util.Arrays;
-import javafx.collections.ObservableList;
-import java.util.Iterator;
-import java.util.Calendar;
-import javafx.scene.control.Alert;
-import javafx.collections.FXCollections;
-import java.util.Collections;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Iterator;
+
+import javafx.collections.ObservableList;
+import javafx.scene.control.Alert;
 
 public class FileManager {
 	public void loadUsers(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
@@ -27,6 +29,12 @@ public class FileManager {
 	}
 
 	public void loadFriendships(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
+		// First check if users exist
+		if (userDb == null || userDb.isEmpty()) {
+			displayMessage("Error", "Please load users first before loading friendships");
+			throw new IllegalStateException("No users loaded - please load users first");
+		}
+
 		try (BufferedReader fileReader = new BufferedReader(new FileReader(filePath))) {
 			String line;
 			while ((line = fileReader.readLine()) != null) {
@@ -55,11 +63,54 @@ public class FileManager {
 					}
 				}
 			}
+			
+			// Validate friendship links to make sure no null entries
+			Iterator<UserManager> userIterator = userDb.iterator();
+			while (userIterator.hasNext()) {
+				UserManager user = userIterator.next();
+				if (user != null && user.getFriends() != null) {
+					// Check for null entries in the friends list
+					CircularDoublyLinkedList<UserManager> friendsList = user.getFriends();
+					CircularDoublyLinkedList<UserManager> validFriends = new CircularDoublyLinkedList<>();
+					
+					Iterator<UserManager> friendsIterator = friendsList.iterator();
+					while (friendsIterator.hasNext()) {
+						UserManager friend = friendsIterator.next();
+						if (friend != null) {
+							validFriends.insertLast(friend);
+						}
+					}
+					
+					user.setFriends(validFriends);
+				}
+			}
 		} catch (IOException e) {
 		}
 	}
 
 	public void loadPosts(String filePath, CircularDoublyLinkedList<PostManager> postDb, CircularDoublyLinkedList<UserManager> userDb) {
+		// First check if users exist
+		if (userDb == null || userDb.isEmpty()) {
+			displayMessage("Error", "Please load users first before loading posts");
+			throw new IllegalStateException("No users loaded - please load users first");
+		}
+		
+		// Check if any friendships exist
+		boolean hasFriendships = false;
+		Iterator<UserManager> userIterator = userDb.iterator();
+		while (userIterator.hasNext()) {
+			UserManager user = userIterator.next();
+			if (user != null && user.getFriends() != null && !user.getFriends().isEmpty()) {
+				hasFriendships = true;
+				break;
+			}
+		}
+		
+		if (!hasFriendships) {
+			displayMessage("Error", "Please create friendships before loading posts");
+			throw new IllegalStateException("No friendships established - please create friendships first");
+		}
+
 		try (BufferedReader fileReader = new BufferedReader(new FileReader(filePath))) {
 			String line;
 			while ((line = fileReader.readLine()) != null) {
@@ -118,47 +169,6 @@ public class FileManager {
 		return null;
 	}
 
-	public void storeUsers(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
-		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
-			Iterator<UserManager> iterator = userDb.iterator();
-			while (iterator.hasNext()) {
-				UserManager user = iterator.next();
-				fileWriter.println(user.getUserID() + "," + user.getName());
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void storeFriendships(String filePath, CircularDoublyLinkedList<UserManager> userDb) {
-		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
-			Iterator<UserManager> iterator = userDb.iterator();
-			while (iterator.hasNext()) {
-				UserManager user = iterator.next();
-				CircularDoublyLinkedList<UserManager> friendsList = user.getFriends();
-				Iterator<UserManager> friendIterator = friendsList.iterator();
-				while (friendIterator.hasNext()) {
-					UserManager friend = friendIterator.next();
-					fileWriter.println(user.getUserID() + "," + friend.getUserID());
-				}
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	public void storePosts(String filePath, CircularDoublyLinkedList<PostManager> postDb) {
-		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
-			Iterator<PostManager> iterator = postDb.iterator();
-			while (iterator.hasNext()) {
-				PostManager post = iterator.next();
-				writePostEntry(fileWriter, post);
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
 	public void saveUsers(String filePath, ObservableList<UserManager> userList) {
 		if (userList == null || userList.isEmpty()) {
 			displayMessage("Error", "No users to save");
@@ -166,26 +176,12 @@ public class FileManager {
 		}
 
 		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
-			fileWriter.println("# Users");
-			fileWriter.println("# Format: user_id,name,age");
-			
 			for (int i = 0; i < userList.size(); i++) {
 				UserManager user = userList.get(i);
 				if (user != null) {
 					fileWriter.println(user.getUserID() + "," + user.getName() + "," + user.getAge());
 				}
 			}
-
-			fileWriter.println("# Users");
-			fileWriter.println("# Format: user_id,name,age");
-			
-			for (int i = 0; i < userList.size(); i++) {
-				UserManager user = userList.get(i);
-				String line = user.getUserID() + "," + user.getName() + "," + user.getAge();
-				fileWriter.println(line);
-			}
-
-			displayMessage("Success", "Users saved to " + filePath);
 		} catch (IOException e) {
 			displayMessage("Error", "Failed to save users: " + e.getMessage());
 		}
@@ -214,7 +210,6 @@ public class FileManager {
 				
 				fileWriter.println(line);
 			}
-			displayMessage("Success", "Friendships saved to " + filePath);
 		} catch (IOException e) {
 			displayMessage("Error", "Failed to save friendships: " + e.getMessage());
 		}
@@ -227,15 +222,19 @@ public class FileManager {
 		}
 
 		try (PrintWriter fileWriter = new PrintWriter(new FileWriter(filePath))) {
-			List<PostManager> sortedPosts = new ArrayList<PostManager>();
+			ArrayList<PostManager> sortedPosts = new ArrayList<PostManager>();
 			Iterator<PostManager> postIterator = posts.iterator();
 			while (postIterator.hasNext()) {
 				sortedPosts.add(postIterator.next());
 			}
-			Collections.sort(sortedPosts, (p1, p2) -> p1.getPostID().compareTo(p2.getPostID()));
 			
-			fileWriter.println("# Posts");
-			fileWriter.println("# Format: post_id,creator_id,content,creation_date,shared_with_ids");
+			// Sort posts by ID using a traditional comparator instead of lambda
+			Collections.sort(sortedPosts, new java.util.Comparator<PostManager>() {
+				@Override
+				public int compare(PostManager p1, PostManager p2) {
+					return p1.getPostID().compareTo(p2.getPostID());
+				}
+			});
 			
 			for (int i = 0; i < sortedPosts.size(); i++) {
 				PostManager post = sortedPosts.get(i);
@@ -244,9 +243,28 @@ public class FileManager {
 					
 					Calendar date = post.getCreationDate();
 					if (date != null) {
-						line = line + date.get(Calendar.YEAR) + "-" + (date.get(Calendar.MONTH) + 1) + "-" + date.get(Calendar.DAY_OF_MONTH);
+						// Format date without ternary operators
+						int day = date.get(Calendar.DAY_OF_MONTH);
+						int month = date.get(Calendar.MONTH) + 1;
+						int year = date.get(Calendar.YEAR);
+						
+						String dayStr;
+						if (day < 10) {
+							dayStr = "0" + day;
+						} else {
+							dayStr = String.valueOf(day);
+						}
+						
+						String monthStr;
+						if (month < 10) {
+							monthStr = "0" + month;
+						} else {
+							monthStr = String.valueOf(month);
+						}
+						
+						line = line + dayStr + "." + monthStr + "." + year;
 					} else {
-						line = line + "2023-01-01";
+						line = line + "01.01.2023";
 					}
 					
 					line = line + ",";
@@ -267,41 +285,16 @@ public class FileManager {
 					fileWriter.println(line);
 				}
 			}
-			
-			displayMessage("Success", "Posts saved to " + filePath);
 		} catch (IOException e) {
 			displayMessage("Error", "Failed to save posts: " + e.getMessage());
 		}
 	}
 	
-	public void writePostEntry(PrintWriter fileWriter, PostManager post) {
-		String output = "";
-		output += post.getPostID() + ",";
-		output += post.getCreator().getUserID() + ",";
-		output += post.getContent() + ",";
-		
-		Calendar date = post.getCreationDate();
-		String dateStr = String.format("%d.%d.%d", 
-				date.get(Calendar.DAY_OF_MONTH),
-				date.get(Calendar.MONTH) + 1,
-				date.get(Calendar.YEAR));
-		output += dateStr;
-		
-		CircularDoublyLinkedList<UserManager> sharedUsers = post.getSharedUsers();
-		Iterator<UserManager> iterator = sharedUsers.iterator();
-		while (iterator.hasNext()) {
-			UserManager user = iterator.next();
-			output += "," + user.getUserID();
-		}
-		
-		fileWriter.println(output);
-	}
-	
 	public void displayMessage(String title, String message) {
-		Alert popup = new Alert(Alert.AlertType.INFORMATION);
-		popup.setTitle(title);
-		popup.setHeaderText(null);
-		popup.setContentText(message);
-		popup.showAndWait();
+		Alert alert = new Alert(Alert.AlertType.ERROR);
+		alert.setTitle(title);
+		alert.setHeaderText(null);
+		alert.setContentText(message);
+		alert.showAndWait();
 	}
 }

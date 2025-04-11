@@ -1,17 +1,19 @@
+import java.io.File;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.control.TabPane;
-import java.io.File;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.scene.text.*;
 import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 
 public class WelcomePage {
 	private TabPane tabPane;
@@ -53,15 +55,15 @@ public class WelcomePage {
 			}
 		});
 		
-		Button postsButton = new Button("Manage Posts");
-		postsButton.setOnAction(e -> {
+		Button friendsButton = new Button("Manage Friendships");
+		friendsButton.setOnAction(e -> {
 			if (tabPane != null) {
 				tabPane.getSelectionModel().select(2);
 			}
 		});
 		
-		Button friendsButton = new Button("Manage Friendships");
-		friendsButton.setOnAction(e -> {
+		Button postsButton = new Button("Manage Posts");
+		postsButton.setOnAction(e -> {
 			if (tabPane != null) {
 				tabPane.getSelectionModel().select(3);
 			}
@@ -81,7 +83,7 @@ public class WelcomePage {
 			}
 		});
 		
-		buttonBox.getChildren().addAll(usersButton, postsButton, friendsButton, reportsButton, dataManagementButton);
+		buttonBox.getChildren().addAll(usersButton, friendsButton, postsButton, reportsButton, dataManagementButton);
 
 		welcomeContent.getChildren().addAll(logoView, welcomeLabel, buttonBox);
 

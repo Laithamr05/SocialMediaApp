@@ -169,6 +169,17 @@ public class PostManagerUI {
     }
 
     private void handlePostFileUpload() {
+        // First check if any friendships exist
+        boolean hasFriendships = checkForFriendships();
+        if (!hasFriendships) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("No Friendships");
+            alert.setContentText("Please create friendships before uploading posts");
+            alert.showAndWait();
+            return;
+        }
+
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Post Data File");
         fileChooser.getExtensionFilters().add(
@@ -179,13 +190,13 @@ public class PostManagerUI {
             try {
                 fileManager.loadPosts(selectedFile.getAbsolutePath(), posts, users);
                 
-                int renamedPosts = removeDuplicatePosts();
+                int duplicatesRemoved = removeDuplicatePosts();
                 
                 updatePostTable();
                 
                 String successMessage = "Posts have been successfully uploaded from the file.";
-                if (renamedPosts > 0) {
-                    successMessage += "\nAssigned new IDs to " + renamedPosts + " duplicate post(s).";
+                if (duplicatesRemoved > 0) {
+                    successMessage += "\nRemoved " + duplicatesRemoved + " duplicate post(s).";
                 }
                 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
@@ -204,51 +215,39 @@ public class PostManagerUI {
     }
 
     private int removeDuplicatePosts() {
-        int duplicatesRenamed = 0;
+        int duplicatesRemoved = 0;
         
-        ArrayList<String> seenPostIds = new ArrayList<String>();
-        ArrayList<PostManager> postsToRename = new ArrayList<PostManager>();
+        // Keep track of post IDs we've already seen
+        ArrayList<String> seenPostIds = new ArrayList<>();
+        ArrayList<PostManager> uniquePosts = new ArrayList<>();
         
+        // First collect all unique posts (keeping only first occurrence of each ID)
         Iterator<PostManager> iterator = posts.iterator();
         while (iterator.hasNext()) {
             PostManager post = iterator.next();
             if (post != null) {
                 String postId = post.getPostID();
                 
-                if (seenPostIds.contains(postId)) {
-                    postsToRename.add(post);
-                    duplicatesRenamed++;
-                } else {
+                if (!seenPostIds.contains(postId)) {
+                    // First time seeing this ID - keep it
                     seenPostIds.add(postId);
+                    uniquePosts.add(post);
+                } else {
+                    // This is a duplicate - don't keep it
+                    duplicatesRemoved++;
                 }
             }
         }
         
-        int highestId = 0;
-        iterator = posts.iterator();
-        while (iterator.hasNext()) {
-            PostManager post = iterator.next();
-            if (post != null) {
-                try {
-                    int id = Integer.parseInt(post.getPostID());
-                    if (id > highestId) {
-                        highestId = id;
-                    }
-                } catch (NumberFormatException e) {
-                }
-            }
+        // Clear the original list
+        posts.clear();
+        
+        // Rebuild the list with only unique posts
+        for (PostManager post : uniquePosts) {
+            posts.insertLast(post);
         }
         
-        for (int i = 0; i < postsToRename.size(); i++) {
-            PostManager postToRename = postsToRename.get(i);
-            String newId = String.valueOf(highestId + i + 1);
-            
-            postToRename.setPostID(newId);
-            
-            seenPostIds.add(newId);
-        }
-        
-        return duplicatesRenamed;
+        return duplicatesRemoved;
     }
 
     public void updatePostTable() {
@@ -271,6 +270,17 @@ public class PostManagerUI {
     }
 
     private void showAddPostDialog() {
+        // First check if any friendships exist
+        boolean hasFriendships = checkForFriendships();
+        if (!hasFriendships) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("No Friendships");
+            alert.setContentText("Please create friendships before creating posts");
+            alert.showAndWait();
+            return;
+        }
+
         Dialog<PostManager> dialog = new Dialog<>();
         dialog.setTitle("Add New Post");
         dialog.setHeaderText("Create New Post");
@@ -438,5 +448,21 @@ public class PostManagerUI {
 
     private String generatePostID() {
         return String.valueOf(posts.size() + 1);
+    }
+
+    private boolean checkForFriendships() {
+        if (users == null || users.isEmpty()) {
+            return false;
+        }
+        
+        Iterator<UserManager> userIterator = users.iterator();
+        while (userIterator.hasNext()) {
+            UserManager user = userIterator.next();
+            if (user != null && user.getFriends() != null && !user.getFriends().isEmpty()) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 } 
