@@ -15,6 +15,7 @@ import javafx.beans.property.BooleanProperty;
 import javafx.util.StringConverter;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Optional;
 
 public class PostManagerUI {
     private TableView<PostManager> postTable;
@@ -22,6 +23,9 @@ public class PostManagerUI {
     private FileManager fileManager;
     private CircularDoublyLinkedList<UserManager> users;
     private WelcomePage welcomePage;
+    private TableManager tableManager;
+    private DialogManager dialogManager;
+    private ComboBox<String> sortOrderComboBox;
 
     public PostManagerUI(CircularDoublyLinkedList<PostManager> posts, FileManager fileManager, 
                         CircularDoublyLinkedList<UserManager> users, WelcomePage welcomePage) {
@@ -29,38 +33,20 @@ public class PostManagerUI {
         this.fileManager = fileManager;
         this.users = users;
         this.welcomePage = welcomePage;
-        this.postTable = createPostTable();
+        this.tableManager = new TableManager(users, posts);
+        this.postTable = tableManager.createPostTable();
+        this.dialogManager = new DialogManager(users, posts, tableManager);
     }
 
     public Tab createPostTab() {
-        VBox postContent = new VBox(10);
+        VBox postContent = new VBox(20);
         postContent.setPadding(new Insets(20));
+        postContent.setAlignment(Pos.CENTER);
 
-        postTable.setPrefHeight(400);
+        HBox tableNavBox = createNavigationButtons();
+        HBox actionButtonsBox = createActionButtons();
 
-        HBox navButtonBar = new HBox(10);
-        navButtonBar.setAlignment(Pos.CENTER);
-        
-        Button prevButton = new Button("◀ Previous");
-        prevButton.setOnAction(e -> navigateToPreviousPost());
-        
-        Button nextButton = new Button("Next ▶");
-        nextButton.setOnAction(e -> navigateToNextPost());
-        
-        navButtonBar.getChildren().addAll(prevButton, nextButton);
-
-        HBox buttonBar = new HBox(10);
-        buttonBar.setAlignment(Pos.CENTER);
-
-        Button createPostButton = new Button("Create Post");
-        createPostButton.setOnAction(e -> showAddPostDialog());
-
-        Button uploadPostButton = new Button("Upload Posts");
-        uploadPostButton.setOnAction(e -> handlePostFileUpload());
-
-        buttonBar.getChildren().addAll(createPostButton, uploadPostButton);
-
-        postContent.getChildren().addAll(postTable, navButtonBar, buttonBar);
+        postContent.getChildren().addAll(postTable, tableNavBox, actionButtonsBox);
 
         Tab postTab = new Tab("Posts", postContent);
         postTab.setClosable(false);
@@ -106,22 +92,10 @@ public class PostManagerUI {
         });
         creatorColumn.setPrefWidth(150);
 
-        TableColumn<PostManager, String> contentColumn = new TableColumn<>("Content");
-        contentColumn.setCellValueFactory(cellData -> {
-            PostManager post = cellData.getValue();
-            return post != null ? new SimpleStringProperty(post.getContent()) : new SimpleStringProperty("");
-        });
+        TableColumn<PostManager, String> contentColumn = createContentColumn();
         contentColumn.setPrefWidth(300);
 
-        TableColumn<PostManager, String> dateColumn = new TableColumn<>("Creation Date");
-        dateColumn.setCellValueFactory(cellData -> {
-            PostManager post = cellData.getValue();
-            if (post == null) {
-                return new SimpleStringProperty("");
-            }
-            Calendar date = post.getCreationDate();
-            return new SimpleStringProperty(date != null ? formatDate(date) : "");
-        });
+        TableColumn<PostManager, String> dateColumn = createDateColumn();
         dateColumn.setPrefWidth(150);
 
         TableColumn<PostManager, String> sharedWithColumn = createSharedUsersColumn();
@@ -129,6 +103,43 @@ public class PostManagerUI {
 
         table.getColumns().addAll(idColumn, creatorColumn, contentColumn, dateColumn, sharedWithColumn);
         return table;
+    }
+
+    private TableColumn<PostManager, String> createContentColumn() {
+        TableColumn<PostManager, String> contentColumn = new TableColumn<>("Content");
+        contentColumn.setCellValueFactory(cellData -> {
+            PostManager post = cellData.getValue();
+            SimpleStringProperty property;
+            if (post != null) {
+                property = new SimpleStringProperty(post.getContent());
+            } else {
+                property = new SimpleStringProperty("");
+            }
+            return property;
+        });
+        contentColumn.setPrefWidth(300);
+        return contentColumn;
+    }
+
+    private TableColumn<PostManager, String> createDateColumn() {
+        TableColumn<PostManager, String> dateColumn = new TableColumn<>("Creation Date");
+        dateColumn.setCellValueFactory(cellData -> {
+            PostManager post = cellData.getValue();
+            String dateString;
+            if (post == null) {
+                dateString = "";
+            } else {
+                Calendar date = post.getCreationDate();
+                if (date != null) {
+                    dateString = formatDate(date);
+                } else {
+                    dateString = "";
+                }
+            }
+            return new SimpleStringProperty(dateString);
+        });
+        dateColumn.setPrefWidth(150);
+        return dateColumn;
     }
 
     private TableColumn<PostManager, String> createSharedUsersColumn() {
@@ -168,101 +179,114 @@ public class PostManagerUI {
         return sharedUsersColumn;
     }
 
+    private HBox createNavigationButtons() {
+        HBox tableNavBox = new HBox(10);
+        tableNavBox.setAlignment(Pos.CENTER);
+        
+        Button prevButton = new Button("◀ Previous");
+        prevButton.setPrefWidth(100);
+        prevButton.setOnAction(e -> navigateToPreviousPost());
+        
+        Button nextButton = new Button("Next ▶");
+        nextButton.setPrefWidth(100);
+        nextButton.setOnAction(e -> navigateToNextPost());
+        
+        tableNavBox.getChildren().addAll(prevButton, nextButton);
+        return tableNavBox;
+    }
+
+    private HBox createActionButtons() {
+        HBox actionButtonsBox = new HBox(10);
+        actionButtonsBox.setAlignment(Pos.CENTER);
+        
+        Button addPostButton = new Button("Add Post");
+        addPostButton.setOnAction(e -> dialogManager.showCreatePostDialog());
+        
+        Button editPostButton = new Button("Edit Post");
+        editPostButton.setOnAction(e -> dialogManager.showEditPostDialog());
+        
+        Button deletePostButton = new Button("Delete Post");
+        deletePostButton.setOnAction(e -> deleteSelectedPost());
+        
+        Button uploadPostsButton = new Button("Upload Posts");
+        uploadPostsButton.setOnAction(e -> {
+            handlePostFileUpload();
+            refreshPostTable();
+        });
+        
+        actionButtonsBox.getChildren().addAll(addPostButton, editPostButton, deletePostButton, uploadPostsButton);
+        return actionButtonsBox;
+    }
+
+    private void navigateToPreviousPost() {
+        TableView<PostManager> table = tableManager.getPostTable();
+        int currentIndex = table.getSelectionModel().getSelectedIndex();
+        
+        if (currentIndex > 0) {
+            table.getSelectionModel().select(currentIndex - 1);
+            table.scrollTo(currentIndex - 1);
+        } else if (currentIndex == -1 && !table.getItems().isEmpty()) {
+            table.getSelectionModel().select(0);
+            table.scrollTo(0);
+        }
+    }
+
+    private void navigateToNextPost() {
+        TableView<PostManager> table = tableManager.getPostTable();
+        int currentIndex = table.getSelectionModel().getSelectedIndex();
+        int lastIndex = table.getItems().size() - 1;
+        
+        if (currentIndex < lastIndex) {
+            table.getSelectionModel().select(currentIndex + 1);
+            table.scrollTo(currentIndex + 1);
+        } else if (currentIndex == -1 && !table.getItems().isEmpty()) {
+            table.getSelectionModel().select(0);
+            table.scrollTo(0);
+        }
+    }
+
+    private void deleteSelectedPost() {
+        PostManager selectedPost = tableManager.getPostTable().getSelectionModel().getSelectedItem();
+        
+        if (dialogManager.confirmDeletePost(selectedPost)) {
+            posts.delete(selectedPost);
+            refreshPostTable();
+            showAlert(Alert.AlertType.INFORMATION, "Success", null, 
+                      "Post '" + selectedPost.getPostID() + "' deleted successfully.");
+        }
+    }
+
     private void handlePostFileUpload() {
-        // First check if any friendships exist
-        boolean hasFriendships = checkForFriendships();
-        if (!hasFriendships) {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("No Friendships");
-            alert.setContentText("Please create friendships before uploading posts");
-            alert.showAndWait();
-            return;
-        }
-
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Select Post Data File");
+        fileChooser.setTitle("Open Post File");
         fileChooser.getExtensionFilters().add(
-            new FileChooser.ExtensionFilter("Text Files", "*.txt"));
-        File selectedFile = fileChooser.showOpenDialog(null);
-
-        if (selectedFile != null) {
-            try {
-                fileManager.loadPosts(selectedFile.getAbsolutePath(), posts, users);
-                
-                int duplicatesRemoved = removeDuplicatePosts();
-                
-                updatePostTable();
-                
-                String successMessage = "Posts have been successfully uploaded from the file.";
-                if (duplicatesRemoved > 0) {
-                    successMessage += "\nRemoved " + duplicatesRemoved + " duplicate post(s).";
-                }
-                
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Success");
-                alert.setHeaderText("File Uploaded");
-                alert.setContentText(successMessage);
-                alert.showAndWait();
-            } catch (Exception e) {
-                Alert alert = new Alert(Alert.AlertType.ERROR);
-                alert.setTitle("Error");
-                alert.setHeaderText("Upload Failed");
-                alert.setContentText("Error reading the file: " + e.getMessage());
-                alert.showAndWait();
+            new FileChooser.ExtensionFilter("Text Files", "*.txt")
+        );
+        
+        File file = fileChooser.showOpenDialog(null);
+        if (file != null) {
+            CircularDoublyLinkedList<PostManager> loadedPosts = fileManager.loadPosts(file.getAbsolutePath(), users);
+            if (loadedPosts != null) {
+                posts = loadedPosts;
+                tableManager.refreshPostTable(posts);
             }
         }
     }
 
-    private int removeDuplicatePosts() {
-        int duplicatesRemoved = 0;
-        
-        // Keep track of post IDs we've already seen
-        ArrayList<String> seenPostIds = new ArrayList<>();
-        ArrayList<PostManager> uniquePosts = new ArrayList<>();
-        
-        // First collect all unique posts (keeping only first occurrence of each ID)
-        Iterator<PostManager> iterator = posts.iterator();
-        while (iterator.hasNext()) {
-            PostManager post = iterator.next();
-            if (post != null) {
-                String postId = post.getPostID();
-                
-                if (!seenPostIds.contains(postId)) {
-                    // First time seeing this ID - keep it
-                    seenPostIds.add(postId);
-                    uniquePosts.add(post);
-                } else {
-                    // This is a duplicate - don't keep it
-                    duplicatesRemoved++;
-                }
-            }
-        }
-        
-        // Clear the original list
-        posts.clear();
-        
-        // Rebuild the list with only unique posts
-        for (PostManager post : uniquePosts) {
-            posts.insertLast(post);
-        }
-        
-        return duplicatesRemoved;
+    public void refreshPostTable() {
+        tableManager.refreshPostTable(posts);
     }
 
-    public void updatePostTable() {
-        ObservableList<PostManager> postList = FXCollections.observableArrayList();
-        Iterator<PostManager> iterator = posts.iterator();
-        while (iterator.hasNext()) {
-            PostManager post = iterator.next();
-            if (post != null) {
-                postList.add(post);
-            }
-        }
-        
-        postTable.getItems().clear();
-        postTable.setItems(postList);
-        postTable.refresh();
+    public TableView<PostManager> getPostTable() {
+        return tableManager.getPostTable();
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String header, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        alert.setContentText(content);
+        alert.showAndWait();
     }
 
     private void updateUIAfterPostsChanged() {
@@ -270,23 +294,12 @@ public class PostManagerUI {
     }
 
     private void showAddPostDialog() {
-        // First check if any friendships exist
-        boolean hasFriendships = checkForFriendships();
-        if (!hasFriendships) {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("No Friendships");
-            alert.setContentText("Please create friendships before creating posts");
-            alert.showAndWait();
-            return;
-        }
-
         Dialog<PostManager> dialog = new Dialog<>();
         dialog.setTitle("Add New Post");
-        dialog.setHeaderText("Create New Post");
+        dialog.setHeaderText("Enter post details");
 
-        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+        ButtonType addButtonType = new ButtonType("Add", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(addButtonType, ButtonType.CANCEL);
 
         GridPane grid = new GridPane();
         grid.setHgap(10);
@@ -295,114 +308,48 @@ public class PostManagerUI {
 
         TextField contentField = new TextField();
         contentField.setPromptText("Post Content");
-
-        ComboBox<UserManager> creatorComboBox = new ComboBox<>();
-        ObservableList<UserManager> userList = FXCollections.observableArrayList();
         
+        ComboBox<UserManager> creatorComboBox = new ComboBox<>();
+        creatorComboBox.setPromptText("Select Creator");
+        ObservableList<UserManager> userList = FXCollections.observableArrayList();
         Iterator<UserManager> iterator = users.iterator();
         while (iterator.hasNext()) {
-            userList.add(iterator.next());
-        }
-        
-        creatorComboBox.setItems(userList);
-
-        Label friendsLabel = new Label("Share with friends:");
-        
-        java.util.LinkedHashMap<UserManager, BooleanProperty> friendSelectionMap = new java.util.LinkedHashMap<UserManager, BooleanProperty>();
-        
-        ListView<UserManager> friendsListView = new ListView<>();
-        friendsListView.setPrefHeight(150);
-        
-        friendsListView.setCellFactory(lv -> {
-            CheckBoxListCell<UserManager> cell = new CheckBoxListCell<>(item -> {
-                if (!friendSelectionMap.containsKey(item)) {
-                    BooleanProperty property = new SimpleBooleanProperty(true);
-                    friendSelectionMap.put(item, property);
-                }
-                return friendSelectionMap.get(item);
-            });
-            
-            cell.setConverter(new StringConverter<UserManager>() {
-                @Override
-                public String toString(UserManager user) {
-                    String name = "";
-                    if (user != null) {
-                        name = user.getName();
-                    }
-                    return name;
-                }
-
-                @Override
-                public UserManager fromString(String string) {
-                    return null;
-                }
-            });
-            
-            return cell;
-        });
-
-        creatorComboBox.setOnAction(e -> {
-            UserManager selectedCreator = creatorComboBox.getValue();
-            if (selectedCreator != null) {
-                ObservableList<UserManager> friendsList = FXCollections.observableArrayList();
-                friendSelectionMap.clear();
-                
-                Iterator<UserManager> friendsIterator = selectedCreator.getFriends().iterator();
-                while (friendsIterator.hasNext()) {
-                    UserManager friend = friendsIterator.next();
-                    friendsList.add(friend);
-                    friendSelectionMap.put(friend, new SimpleBooleanProperty(true));
-                }
-                friendsListView.setItems(friendsList);
+            UserManager user = iterator.next();
+            if (user != null) {
+                userList.add(user);
             }
-        });
+        }
+        creatorComboBox.setItems(userList);
 
         grid.add(new Label("Content:"), 0, 0);
         grid.add(contentField, 1, 0);
         grid.add(new Label("Creator:"), 0, 1);
         grid.add(creatorComboBox, 1, 1);
-        grid.add(friendsLabel, 0, 2);
-        grid.add(friendsListView, 1, 2);
 
         dialog.getDialogPane().setContent(grid);
 
         dialog.setResultConverter(dialogButton -> {
-            if (dialogButton == saveButtonType) {
+            if (dialogButton == addButtonType) {
+                String content = contentField.getText();
                 UserManager creator = creatorComboBox.getValue();
-                if (contentField.getText().isEmpty() || creator == null) {
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("Error");
-                    alert.setHeaderText("Invalid Input");
-                    alert.setContentText("Please fill in all fields and select a creator.");
-                    alert.showAndWait();
+                
+                if (content.isEmpty() || creator == null) {
+                    showAlert(Alert.AlertType.ERROR, "Error", "Invalid Input", "Please fill in all fields");
                     return null;
                 }
 
                 String postID = generatePostID();
-                Calendar currentDate = Calendar.getInstance();
-                PostManager newPost = new PostManager(postID, creator, contentField.getText(), currentDate);
-
-                for (Map.Entry<UserManager, BooleanProperty> entry : friendSelectionMap.entrySet()) {
-                    if (entry.getValue().get()) {
-                        newPost.addSharedUser(entry.getKey());
-                    }
-                }
-
-                posts.insertLast(newPost);
-                updatePostTable();
-                
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Success");
-                alert.setHeaderText("Post Created");
-                alert.setContentText("New post has been created successfully.");
-                alert.showAndWait();
-                
-                return newPost;
+                Calendar creationDate = Calendar.getInstance();
+                return new PostManager(postID, creator, content, creationDate);
             }
             return null;
         });
 
-        dialog.showAndWait();
+        Optional<PostManager> result = dialog.showAndWait();
+        result.ifPresent(post -> {
+            posts.insertLast(post);
+            tableManager.refreshPostTable(posts);
+        });
     }
     
     private String formatDate(Calendar date) {
@@ -420,34 +367,21 @@ public class PostManagerUI {
         return formattedDate;
     }
 
-    public TableView<PostManager> getPostTable() {
-        return postTable;
-    }
-
-    private void navigateToPreviousPost() {
-        int currentIndex = postTable.getSelectionModel().getSelectedIndex();
-        if (currentIndex > 0) {
-            postTable.getSelectionModel().select(currentIndex - 1);
-            postTable.scrollTo(currentIndex - 1);
-        } else if (postTable.getItems().size() > 0) {
-            postTable.getSelectionModel().select(postTable.getItems().size() - 1);
-            postTable.scrollTo(postTable.getItems().size() - 1);
-        }
-    }
-    
-    private void navigateToNextPost() {
-        int currentIndex = postTable.getSelectionModel().getSelectedIndex();
-        if (currentIndex < postTable.getItems().size() - 1) {
-            postTable.getSelectionModel().select(currentIndex + 1);
-            postTable.scrollTo(currentIndex + 1);
-        } else if (postTable.getItems().size() > 0) {
-            postTable.getSelectionModel().select(0);
-            postTable.scrollTo(0);
-        }
-    }
-
     private String generatePostID() {
-        return String.valueOf(posts.size() + 1);
+        int maxID = 0;
+        Iterator<PostManager> iterator = posts.iterator();
+        while (iterator.hasNext()) {
+            PostManager post = iterator.next();
+            if (post != null) {
+                try {
+                    int id = Integer.parseInt(post.getPostID());
+                    maxID = Math.max(maxID, id);
+                } catch (NumberFormatException e) {
+                    // Skip invalid IDs
+                }
+            }
+        }
+        return String.valueOf(maxID + 1);
     }
 
     private boolean checkForFriendships() {
@@ -464,5 +398,54 @@ public class PostManagerUI {
         }
         
         return false;
+    }
+
+    private void showSharePostDialog() {
+        PostManager selectedPost = tableManager.getSelectedPost();
+        if (selectedPost == null) {
+            showAlert(Alert.AlertType.ERROR, "Error", "No Post Selected", "Please select a post to share");
+            return;
+        }
+
+        Dialog<Boolean> dialog = new Dialog<>();
+        dialog.setTitle("Share Post");
+        dialog.setHeaderText("Select users to share with");
+
+        ButtonType shareButtonType = new ButtonType("Share", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(shareButtonType, ButtonType.CANCEL);
+
+        ListView<UserManager> userListView = new ListView<>();
+        ObservableList<UserManager> userList = FXCollections.observableArrayList();
+        Iterator<UserManager> iterator = users.iterator();
+        while (iterator.hasNext()) {
+            UserManager user = iterator.next();
+            if (user != null && !user.equals(selectedPost.getCreator())) {
+                userList.add(user);
+            }
+        }
+        userListView.setItems(userList);
+        userListView.setCellFactory(CheckBoxListCell.forListView(user -> {
+            BooleanProperty selected = new SimpleBooleanProperty(selectedPost.getSharedUsers().contains(user));
+            selected.addListener((obs, wasSelected, isNowSelected) -> {
+                if (isNowSelected) {
+                    selectedPost.shareWith(user);
+                } else {
+                    selectedPost.getSharedUsers().delete(user);
+                }
+            });
+            return selected;
+        }));
+
+        dialog.getDialogPane().setContent(userListView);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == shareButtonType) {
+                return true;
+            }
+            return false;
+        });
+
+        dialog.showAndWait();
+        tableManager.refreshPostTable(posts);
     }
 } 

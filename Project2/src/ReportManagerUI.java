@@ -25,83 +25,18 @@ import javafx.stage.FileChooser;
 public class ReportManagerUI {
 	private CircularDoublyLinkedList<UserManager> userDatabase;
 	private CircularDoublyLinkedList<PostManager> postDatabase;
-	private ReportManager analytics;
+	private ReportManager reportManager;
 	private Tab statisticsTab;
 	private ComboBox<String> reportTypeSelector;
 	private TextField userLimitField;
-
 	private Label selectedUserLabel;
-	private int currentUserIndex = 0;
-
-	private ReportDialogManager dialogManager;
-	private ReportDisplayManager displayManager;
-	private ReportNavigationManager navigationManager;
 
 	public ReportManagerUI(CircularDoublyLinkedList<UserManager> userDatabase,
 			CircularDoublyLinkedList<PostManager> postDatabase) {
 		this.userDatabase = userDatabase;
 		this.postDatabase = postDatabase;
-		this.analytics = new ReportManager(userDatabase, postDatabase);
 		this.selectedUserLabel = new Label("No users available");
-
-		// Initialize manager components
-		this.dialogManager = new ReportDialogManager();
-		this.displayManager = new ReportDisplayManager(userDatabase, postDatabase, analytics, dialogManager);
-		this.navigationManager = new ReportNavigationManager(userDatabase, selectedUserLabel, dialogManager);
-	}
-
-	public void selectPreviousUser() {
-		if (userDatabase.isEmpty()) {
-			showNotification("No users available");
-			return;
-		}
-
-		currentUserIndex--;
-		if (currentUserIndex < 0) {
-			currentUserIndex = userDatabase.size() - 1;
-		}
-
-		updateUserDisplay();
-	}
-
-	public void selectNextUser() {
-		if (userDatabase.isEmpty()) {
-			showNotification("No users available");
-			return;
-		}
-
-		currentUserIndex++;
-		if (currentUserIndex >= userDatabase.size()) {
-			currentUserIndex = 0;
-		}
-
-		updateUserDisplay();
-	}
-
-	public void updateUserDisplay() {
-		UserManager currentUser = getCurrentUser();
-		if (currentUser != null) {
-			selectedUserLabel.setText(currentUser.getName());
-		} else {
-			selectedUserLabel.setText("No users available");
-		}
-	}
-
-	public UserManager getCurrentUser() {
-		if (userDatabase.isEmpty() || currentUserIndex < 0) {
-			return null;
-		}
-
-		Iterator<UserManager> iterator = userDatabase.iterator();
-		int count = 0;
-		while (iterator.hasNext()) {
-			UserManager user = iterator.next();
-			if (count == currentUserIndex) {
-				return user;
-			}
-			count++;
-		}
-		return null;
+		this.reportManager = new ReportManager(userDatabase, postDatabase, selectedUserLabel);
 	}
 
 	public Tab createReportsTab() {
@@ -169,11 +104,11 @@ public class ReportManagerUI {
 
 		Button prevButton = new Button("◀ Previous");
 		prevButton.setPrefWidth(100);
-		prevButton.setOnAction(e -> navigationManager.selectPreviousUser());
+		prevButton.setOnAction(e -> reportManager.selectPreviousUser());
 
 		Button nextButton = new Button("Next ▶");
 		nextButton.setPrefWidth(100);
-		nextButton.setOnAction(e -> navigationManager.selectNextUser());
+		nextButton.setOnAction(e -> reportManager.selectNextUser());
 
 		selectedUserLabel.setStyle("-fx-font-weight: bold;");
 
@@ -188,15 +123,15 @@ public class ReportManagerUI {
 
 		Button viewCreatedButton = new Button("View Created Posts");
 		viewCreatedButton.setPrefWidth(150);
-		viewCreatedButton.setOnAction(e -> displayManager.showCreatedPostsByUser(navigationManager.getCurrentUser()));
+		viewCreatedButton.setOnAction(e -> reportManager.showCreatedPostsByUser(reportManager.getCurrentUser()));
 
 		Button viewSharedButton = new Button("View Shared Posts");
 		viewSharedButton.setPrefWidth(150);
-		viewSharedButton.setOnAction(e -> displayManager.showSharedPostsWithUser(navigationManager.getCurrentUser()));
+		viewSharedButton.setOnAction(e -> reportManager.showSharedPostsWithUser(reportManager.getCurrentUser()));
 
 		Button viewStatsButton = new Button("View Engagement Stats");
 		viewStatsButton.setPrefWidth(150);
-		viewStatsButton.setOnAction(e -> displayManager.showEngagementStats(navigationManager.getCurrentUser()));
+		viewStatsButton.setOnAction(e -> reportManager.showEngagementStats(reportManager.getCurrentUser()));
 
 		actionButtonsBox.getChildren().addAll(viewCreatedButton, viewSharedButton, viewStatsButton);
 
@@ -204,33 +139,35 @@ public class ReportManagerUI {
 	}
 
 	public void generateReport() {
-		String selectedType = reportTypeSelector.getValue();
-		if (selectedType == null) {
-			dialogManager.showNotification("Please select a report type");
+		String reportType = reportTypeSelector.getValue();
+		if (reportType == null || reportType.isEmpty()) {
+			reportManager.showNotification("No report type selected", "Please select a report type.");
 			return;
 		}
 
+		int limit;
 		try {
-			int limit = Integer.parseInt(userLimitField.getText());
+			limit = Integer.parseInt(userLimitField.getText());
 			if (limit <= 0) {
-				dialogManager.showNotification("Please enter a positive number for the user limit");
+				reportManager.showNotification("Invalid limit", "Please enter a positive number for the user limit.");
 				return;
 			}
-
-			displayManager.generateReport(selectedType, limit);
 		} catch (NumberFormatException e) {
-			dialogManager.showNotification("Please enter a valid number for the user limit");
+			reportManager.showNotification("Invalid input", "Please enter a valid number for the user limit.");
+			return;
 		}
+
+		reportManager.generateReport(reportType, limit);
 	}
 
 	public void showCreatedPostsByUser() {
-		UserManager selectedUser = getCurrentUser();
+		UserManager selectedUser = reportManager.getCurrentUser();
 		if (selectedUser == null) {
 			showNotification("No users available");
 			return;
 		}
 
-		ObservableList<PostManager> userPosts = analytics.getPostsByUser(selectedUser);
+		ObservableList<PostManager> userPosts = reportManager.getPostsByUser(selectedUser);
 
 		String resultText = "";
 		resultText += "=== POSTS CREATED BY " + selectedUser.getName().toUpperCase() + " ===\n\n";
@@ -254,13 +191,13 @@ public class ReportManagerUI {
 	}
 
 	public void showSharedPostsWithUser() {
-		UserManager selectedUser = getCurrentUser();
+		UserManager selectedUser = reportManager.getCurrentUser();
 		if (selectedUser == null) {
 			showNotification("No users available");
 			return;
 		}
 
-		ObservableList<PostManager> sharedPosts = analytics.getPostsSharedWithUser(selectedUser);
+		ObservableList<PostManager> sharedPosts = reportManager.getPostsSharedWithUser(selectedUser);
 
 		String resultText = "";
 		resultText += "=== POSTS SHARED WITH " + selectedUser.getName().toUpperCase() + " ===\n\n";
@@ -275,28 +212,31 @@ public class ReportManagerUI {
 				resultText += "POST #" + (i + 1) + "\n";
 				resultText += "ID: " + post.getPostID() + "\n";
 				resultText += "Content: " + post.getContent() + "\n";
-				resultText += "Created by: " + post.getCreator().getName() + "\n";
+				resultText += "Creator: " + post.getCreator().getName() + "\n";
 				resultText += "Created on: " + formatDateString(post.getCreationDate()) + "\n";
 				resultText += "-----------------------------------\n";
 			}
 		}
 
-		showNotification("Posts Shared", resultText);
+		showNotification("Shared Posts", resultText);
 	}
 
 	public void showEngagementStats() {
-		UserManager selectedUser = getCurrentUser();
+		UserManager selectedUser = reportManager.getCurrentUser();
 		if (selectedUser == null) {
 			showNotification("No users available");
 			return;
 		}
 
-		ObservableList<PostManager> createdPosts = analytics.getPostsByUser(selectedUser);
-		ObservableList<PostManager> sharedPosts = analytics.getPostsSharedWithUser(selectedUser);
+		int postCount = reportManager.countPostsByUser(selectedUser);
+		ObservableList<PostManager> sharedPosts = reportManager.getPostsSharedWithUser(selectedUser);
+		int shareCount = sharedPosts.size();
 
-		String resultText = selectedUser.getName() + " has created " + createdPosts.size() + " post"
-				+ (createdPosts.size() != 1 ? "s" : "") + " and has " + sharedPosts.size() + " post"
-				+ (sharedPosts.size() != 1 ? "s" : "") + " shared with him";
+		String resultText = "";
+		resultText += "=== ENGAGEMENT STATS FOR " + selectedUser.getName().toUpperCase() + " ===\n\n";
+		resultText += "Posts created: " + postCount + "\n";
+		resultText += "Posts shared: " + shareCount + "\n";
+		resultText += "Total engagement: " + (postCount + shareCount) + "\n";
 
 		showNotification("Engagement Stats", resultText);
 	}
@@ -322,9 +262,9 @@ public class ReportManagerUI {
 				showNotification("No Posts Available", "There are no posts in the system to generate this report.");
 				return;
 			}
-			reportText = analytics.generateMostActiveUsersReport(userLimit);
+			reportText = reportManager.generateMostActiveUsersReport(userLimit);
 		} else {
-			reportText = analytics.generateRecentActivityReport(userLimit);
+			reportText = reportManager.generateRecentActivityReport(userLimit);
 		}
 
 		showNotification(showMostPosts ? "Most Active Users" : "Recent Activity", reportText);
@@ -398,7 +338,7 @@ public class ReportManagerUI {
 					UserManager user = sortedUserList.get(i);
 					reportWriter.println("User: " + user.getName());
 
-					ObservableList<PostManager> userPosts = analytics.getPostsByUser(user);
+					ObservableList<PostManager> userPosts = reportManager.getPostsByUser(user);
 					if (userPosts.isEmpty()) {
 						reportWriter.println("No posts created by this user.");
 					} else {
@@ -457,7 +397,7 @@ public class ReportManagerUI {
 					UserManager user = sortedUserList.get(i);
 					reportWriter.println("User: " + user.getName());
 
-					ObservableList<PostManager> sharedPosts = analytics.getPostsSharedWithUser(user);
+					ObservableList<PostManager> sharedPosts = reportManager.getPostsSharedWithUser(user);
 					if (sharedPosts.isEmpty()) {
 						reportWriter.println("No posts shared with this user.");
 					} else {
@@ -534,5 +474,93 @@ public class ReportManagerUI {
 		}
 
 		return dayStr + "." + monthStr + "." + year;
+	}
+
+	private void showUserActivityReport(UserManager user) {
+		if (user == null) {
+			showNotification("Error", "Please select a user first");
+			return;
+		}
+
+		CircularDoublyLinkedList<PostManager> createdPosts = new CircularDoublyLinkedList<>();
+		CircularDoublyLinkedList<PostManager> sharedPosts = new CircularDoublyLinkedList<>();
+
+		Iterator<PostManager> iterator = postDatabase.iterator();
+		while (iterator.hasNext()) {
+			PostManager post = iterator.next();
+			if (post != null) {
+				if (post.getCreator().equals(user)) {
+					createdPosts.insertLast(post);
+				}
+				if (post.getSharedUsers().contains(user)) {
+					sharedPosts.insertLast(post);
+				}
+			}
+		}
+
+		String pluralSuffixCreated;
+		if (createdPosts.size() != 1) {
+			pluralSuffixCreated = "s";
+		} else {
+			pluralSuffixCreated = "";
+		}
+
+		String pluralSuffixShared;
+		if (sharedPosts.size() != 1) {
+			pluralSuffixShared = "s";
+		} else {
+			pluralSuffixShared = "";
+		}
+
+		String reportText = user.getName() + " has created " + createdPosts.size() + " post" + pluralSuffixCreated + 
+						  " and has " + sharedPosts.size() + " post" + pluralSuffixShared + " shared with him";
+
+		showNotification("User Activity Report", reportText);
+	}
+
+	private void showEngagementStatsReport() {
+		String reportText = "=== ENGAGEMENT STATS REPORT ===\n\n";
+
+		Iterator<UserManager> userIterator = userDatabase.iterator();
+		while (userIterator.hasNext()) {
+			UserManager user = userIterator.next();
+			if (user != null) {
+				int postCount = 0;
+				int shareCount = 0;
+
+				Iterator<PostManager> postIterator = postDatabase.iterator();
+				while (postIterator.hasNext()) {
+					PostManager post = postIterator.next();
+					if (post != null) {
+						if (post.getCreator().equals(user)) {
+							postCount++;
+						}
+						if (post.getSharedUsers().contains(user)) {
+							shareCount++;
+						}
+					}
+				}
+
+				String pluralSuffixPosts;
+				if (postCount != 1) {
+					pluralSuffixPosts = "s";
+				} else {
+					pluralSuffixPosts = "";
+				}
+
+				String pluralSuffixShares;
+				if (shareCount != 1) {
+					pluralSuffixShares = "s";
+				} else {
+					pluralSuffixShares = "";
+				}
+
+				reportText += user.getName() + ":\n";
+				reportText += "- Created " + postCount + " post" + pluralSuffixPosts + "\n";
+				reportText += "- Shared " + shareCount + " post" + pluralSuffixShares + "\n\n";
+			}
+		}
+
+		showNotification("Engagement Stats Report", reportText);
 	}
 }

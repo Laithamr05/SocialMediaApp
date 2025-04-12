@@ -1,4 +1,6 @@
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 
 import javafx.collections.FXCollections;
@@ -10,6 +12,8 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
@@ -17,16 +21,17 @@ import javafx.stage.FileChooser;
 public class FriendshipManagerUI {
 	private CircularDoublyLinkedList<UserManager> users;
 	private FileManager fileManager;
-	private FriendshipTableManager tableManager;
-	private FriendshipDialogManager dialogManager;
-	private ComboBox<String> sortOrderComboBox;
+	private WelcomePage welcomePage;
+	private TableManager tableManager;
+	private DialogManager dialogManager;
 	private ComboBox<UserManager> userComboBox;
 
-	public FriendshipManagerUI(CircularDoublyLinkedList<UserManager> users, FileManager fileManager) {
+	public FriendshipManagerUI(CircularDoublyLinkedList<UserManager> users, FileManager fileManager, WelcomePage welcomePage) {
 		this.users = users;
 		this.fileManager = fileManager;
-		this.tableManager = new FriendshipTableManager(users);
-		this.dialogManager = new FriendshipDialogManager(users, tableManager);
+		this.welcomePage = welcomePage;
+		this.tableManager = new TableManager(users, null);
+		this.dialogManager = new DialogManager(users, null, tableManager);
 	}
 
 	public Tab createFriendshipTab() {
@@ -37,17 +42,14 @@ public class FriendshipManagerUI {
 		VBox friendshipContent = new VBox(10);
 		friendshipContent.setPadding(new Insets(20));
 
-		// Get the table from the table manager
-		TableView<UserManager> friendshipTable = tableManager.getFriendshipTable();
+		// Create the friendship table first
+		TableView<UserManager> friendshipTable = tableManager.createFriendshipTable();
 		friendshipTable.setPrefHeight(400);
 
-		// Set up user selection and sorting controls
 		HBox controlsBox = createControlsBox();
 
-		// Set up navigation buttons
 		HBox navButtonBar = createNavigationButtons();
 
-		// Set up action buttons
 		HBox buttonBar = createActionButtons();
 
 		friendshipContent.getChildren().addAll(controlsBox, friendshipTable, navButtonBar, buttonBar);
@@ -74,14 +76,7 @@ public class FriendshipManagerUI {
 		userComboBox.setPrefWidth(200);
 		userComboBox.setOnAction(e -> updateFriendshipDisplay());
 
-		Label sortLabel = new Label("Sort Order:");
-		sortOrderComboBox = new ComboBox<>();
-		sortOrderComboBox.getItems().addAll("Unsorted", "Ascending by Username", "Descending by Username");
-		sortOrderComboBox.setValue("Unsorted");
-		sortOrderComboBox.setPrefWidth(200);
-		sortOrderComboBox.setOnAction(e -> updateFriendshipDisplay());
-
-		controlsBox.getChildren().addAll(userLabel, userComboBox, sortLabel, sortOrderComboBox);
+		controlsBox.getChildren().addAll(userLabel, userComboBox);
 		
 		return controlsBox;
 	}
@@ -121,7 +116,13 @@ public class FriendshipManagerUI {
 
 	private void updateUserComboBox() {
 		userComboBox.getItems().clear();
-		userComboBox.setItems(FXCollections.observableArrayList(tableManager.getSortedUserList("Unsorted")));
+		Iterator<UserManager> iterator = users.iterator();
+		while (iterator.hasNext()) {
+			UserManager user = iterator.next();
+			if (user != null) {
+				userComboBox.getItems().add(user);
+			}
+		}
 		userComboBox.setValue(null);
 	}
 
@@ -135,38 +136,21 @@ public class FriendshipManagerUI {
 	}
 
 	private void handleFriendshipFileUpload() {
-		// Check if users exist and are not empty
 		if (users == null || users.isEmpty()) {
 			showAlert(Alert.AlertType.ERROR, "Error", null, "No users loaded - please load users first");
 			return;
 		}
-		
-		// Verify that users actually contain data
-		boolean hasUsers = false;
-		Iterator<UserManager> userIterator = users.iterator();
-		while (userIterator.hasNext()) {
-			UserManager user = userIterator.next();
-			if (user != null) {
-				hasUsers = true;
-				break;
-			}
-		}
-		
-		if (!hasUsers) {
-			showAlert(Alert.AlertType.ERROR, "Error", null, "No valid users found - please load users first");
-			return;
-		}
-		
+
 		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Open Friendship Data File");
+		fileChooser.setTitle("Select Friendship Data File");
 		fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text Files", "*.txt"));
-		
 		File selectedFile = fileChooser.showOpenDialog(null);
+
 		if (selectedFile != null) {
 			try {
-				fileManager.loadFriendships(selectedFile.getPath(), users);
-				tableManager.refreshTable();
-				showAlert(Alert.AlertType.INFORMATION, "Success", null, "Friendships loaded successfully!");
+				fileManager.loadFriendships(selectedFile.getAbsolutePath(), users);
+				tableManager.refreshFriendshipTable(users);
+				showAlert(Alert.AlertType.INFORMATION, "Success", null, "Friendships loaded successfully");
 			} catch (Exception e) {
 				showAlert(Alert.AlertType.ERROR, "Error", null, "Error loading friendship data: " + e.getMessage());
 			}
@@ -181,7 +165,6 @@ public class FriendshipManagerUI {
 			table.getSelectionModel().select(currentIndex - 1);
 			table.scrollTo(currentIndex - 1);
 		} else if (currentIndex == -1 && !table.getItems().isEmpty()) {
-			// No selection, select the first item
 			table.getSelectionModel().select(0);
 			table.scrollTo(0);
 		}
@@ -196,7 +179,6 @@ public class FriendshipManagerUI {
 			table.getSelectionModel().select(currentIndex + 1);
 			table.scrollTo(currentIndex + 1);
 		} else if (currentIndex == -1 && !table.getItems().isEmpty()) {
-			// No selection, select the first item
 			table.getSelectionModel().select(0);
 			table.scrollTo(0);
 		}
@@ -215,22 +197,31 @@ public class FriendshipManagerUI {
 			return;
 		}
 
+		// Convert friends list to ArrayList for sorting
+		ArrayList<UserManager> sortedFriends = new ArrayList<>();
+		Iterator<UserManager> iterator = friends.iterator();
+		while (iterator.hasNext()) {
+			UserManager friend = iterator.next();
+			if (friend != null) {
+				sortedFriends.add(friend);
+			}
+		}
+
+		// Sort friends by name
+		Collections.sort(sortedFriends, (f1, f2) -> f1.getName().compareTo(f2.getName()));
+
 		StringBuilder resultText = new StringBuilder();
 		resultText.append("=== FRIENDS OF ").append(user.getName().toUpperCase()).append(" ===\n\n");
 		resultText.append("Total friends: ").append(friends.size()).append("\n\n");
 
-		java.util.Iterator<UserManager> iterator = friends.iterator();
 		int friendCount = 1;
-		while (iterator.hasNext()) {
-			UserManager friend = iterator.next();
-			if (friend != null) {
-				resultText.append("FRIEND #").append(friendCount).append("\n");
-				resultText.append("ID: ").append(friend.getUserID()).append("\n");
-				resultText.append("Name: ").append(friend.getName()).append("\n");
-				resultText.append("Age: ").append(friend.getAge()).append("\n");
-				resultText.append("-----------------------------------\n");
-				friendCount++;
-			}
+		for (UserManager friend : sortedFriends) {
+			resultText.append("FRIEND #").append(friendCount).append("\n");
+			resultText.append("ID: ").append(friend.getUserID()).append("\n");
+			resultText.append("Name: ").append(friend.getName()).append("\n");
+			resultText.append("Age: ").append(friend.getAge()).append("\n");
+			resultText.append("-----------------------------------\n");
+			friendCount++;
 		}
 
 		showNotification("Friends List", resultText.toString());
@@ -248,7 +239,14 @@ public class FriendshipManagerUI {
 		Alert alert = new Alert(Alert.AlertType.INFORMATION);
 		alert.setTitle(title);
 		alert.setHeaderText(null);
-		alert.setContentText(content);
+		
+		TextArea textArea = new TextArea(content);
+		textArea.setEditable(false);
+		textArea.setWrapText(true);
+		textArea.setPrefRowCount(15);
+		textArea.setPrefColumnCount(50);
+		
+		alert.getDialogPane().setContent(textArea);
 		alert.getDialogPane().setPrefHeight(500);
 		alert.getDialogPane().setPrefWidth(500);
 		alert.showAndWait();

@@ -4,105 +4,135 @@
 // section 7
 
 import java.util.Calendar;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import java.util.Iterator;
 
-public class PostManager implements Comparable<PostManager> { // class for managing post data and operations
-    private String postID; // unique identifier for the post
-    private UserManager creator; // user who created the post
-    private String content; // content of the post
-    private Calendar creationDate; // date when the post was created
-    private CircularDoublyLinkedList<UserManager> sharedUsers; // list of users the post is shared with
+// Handles post data and sharing functionality in the social network application
+public class PostManager implements Comparable<PostManager> {
+    // Post identification and content information
+    private String postID;
+    private UserManager creator;
+    private String content;
+    private Calendar creationDate;
+    
+    // List of users this post is shared with
+    private CircularDoublyLinkedList<UserManager> sharedUsers;
+    
+    // Properties for table display
+    private SimpleStringProperty postIDProperty;
+    private SimpleStringProperty contentProperty;
+    private SimpleStringProperty dateProperty;
+    private SimpleStringProperty authorProperty;
 
-    public PostManager(String postID, UserManager creator, String content, Calendar creationDate) { // constructor to initialize post
-        this.postID = postID; // set post id
-        this.creator = creator; // set creator
-        this.content = content; // set content
-        this.creationDate = creationDate; // set creation date
-        this.sharedUsers = new CircularDoublyLinkedList<UserManager>(); // initialize shared users list
-    }
-
-    public String getPostID() { // getter for post id
-        return postID;
-    }
-
-    public void setPostID(String postID) { // setter for post id
+    // Creates a new post with the given information
+    public PostManager(String postID, UserManager creator, String content, Calendar creationDate) {
         this.postID = postID;
-    }
-
-    public UserManager getCreator() { // getter for creator
-        return creator;
-    }
-
-    public String getContent() { // getter for content
-        return content;
-    }
-    
-    public void setContent(String content) { // setter for content
+        this.creator = creator;
         this.content = content;
+        this.creationDate = creationDate;
+        this.sharedUsers = new CircularDoublyLinkedList<UserManager>();
+        
+        // Initialize table display properties
+        this.postIDProperty = new SimpleStringProperty(postID);
+        this.contentProperty = new SimpleStringProperty(content);
+        this.dateProperty = new SimpleStringProperty(formatDate(creationDate));
+        
+        // Set author name for display
+        String authorName = creator != null ? creator.getName() : "Unknown";
+        this.authorProperty = new SimpleStringProperty(authorName);
+    }
+    
+    // Formats a Calendar date into a readable string (DD.MM.YYYY)
+    private String formatDate(Calendar date) {
+        if (date == null) return "";
+        return String.format("%02d.%02d.%d", 
+            date.get(Calendar.DAY_OF_MONTH),
+            date.get(Calendar.MONTH) + 1,
+            date.get(Calendar.YEAR));
     }
 
-    public Calendar getCreationDate() { // getter for creation date
-        return creationDate;
+    // Creates a new post and optionally shares it with all friends
+    public static PostManager createPost(String postID, UserManager creator, String content, Calendar creationDate, boolean shareWithAllFriends) {
+        PostManager newPost = new PostManager(postID, creator, content, creationDate);
+        if (shareWithAllFriends && creator != null) {
+            newPost.shareWithAllFriends();
+        }
+        return newPost;
     }
 
-    public CircularDoublyLinkedList<UserManager> getSharedUsers() { // getter for shared users list
-        return sharedUsers;
+    // Basic getters and setters for post properties
+    public String getPostID() { return postID; }
+    public void setPostID(String postID) { 
+        this.postID = postID;
+        this.postIDProperty.set(postID);
+    }
+    
+    public UserManager getCreator() { return creator; }
+    public void setCreator(UserManager creator) { 
+        this.creator = creator;
+        this.authorProperty.set(creator != null ? creator.getName() : "Unknown");
+    }
+    
+    public String getContent() { return content; }
+    public void setContent(String content) { 
+        this.content = content;
+        this.contentProperty.set(content);
+    }
+    
+    public Calendar getCreationDate() { return creationDate; }
+    public void setCreationDate(Calendar creationDate) { 
+        this.creationDate = creationDate;
+        this.dateProperty.set(formatDate(creationDate));
     }
 
-    public void addSharedUser(UserManager user) { // method to add a user to shared users
-        if (!sharedUsers.contains(user)) { // check if user is already in shared list
-            sharedUsers.insertLast(user); // add user to the end of shared list
+    // Returns the list of users this post is shared with
+    public CircularDoublyLinkedList<UserManager> getSharedUsers() { return sharedUsers; }
+
+    // Shares this post with a specific user
+    public void shareWith(UserManager user) {
+        if (!sharedUsers.contains(user)) {
+            sharedUsers.insertLast(user);
         }
     }
     
-    public void shareWith(UserManager user) { // method to share post with a user
-        addSharedUser(user); // add user to shared users
-    }
-    
-    public void clearSharedUsers() { // method to clear all shared users
-        // Create a new empty list rather than trying to clear the existing one
-        this.sharedUsers = new CircularDoublyLinkedList<UserManager>(); // reset shared users list
-    }
-
-    public boolean isSharedWith(UserManager user) { // method to check if post is shared with a user
-        return sharedUsers.contains(user); // check if user is in shared list
-    }
-
-    @Override
-    public boolean equals(Object obj) { // method to check if two posts are equal
-        if (this == obj) return true; // check if same object
-        if (obj == null || getClass() != obj.getClass()) return false; // check if null or different class
-        PostManager other = (PostManager) obj; // cast to PostManager
-        if (postID == null && other.postID == null) return true; // both IDs null, consider equal
-        if (postID == null || other.postID == null) return false; // one ID null, not equal
-        return postID.equals(other.postID); // compare post IDs
-    }
-
-    @Override
-    public String toString() { // method to convert post to string representation
-        String creatorName = ""; // initialize creator name
-        if (creator != null) { // check if creator exists
-            creatorName = creator.getName(); // get creator name
-        } else {
-            creatorName = "Unknown"; // use "Unknown" if no creator
-        }
+    // Shares this post with all friends of the creator
+    public void shareWithAllFriends() {
+        if (creator == null) return;
+        CircularDoublyLinkedList<UserManager> friends = creator.getFriends();
+        if (friends == null) return;
         
-        String postContent = ""; // initialize post content
-        if (content != null) { // check if content exists
-            postContent = content; // use actual content
-        } else {
-            postContent = ""; // use empty string if no content
+        Iterator<UserManager> iterator = friends.iterator();
+        while (iterator.hasNext()) {
+            UserManager friend = iterator.next();
+            if (friend != null) {
+                shareWith(friend);
+            }
         }
-        
-        return "Post ID: " + postID + ", Creator: " + creatorName + ", Content: " + postContent; // return formatted string
     }
 
+    // Returns a string representation of the post
     @Override
-    public int compareTo(PostManager other) { // method to compare posts by date
-        if (this == other) return 0; // same object, equal
-        if (other == null) return 1; // null comes before this
-        if (creationDate == null && other.creationDate == null) return 0; // both dates null, equal
-        if (creationDate == null) return -1; // null date comes before non-null
-        if (other.creationDate == null) return 1; // non-null date comes after null
-        return other.creationDate.compareTo(creationDate); // compare by creation date (reverse order)
+    public String toString() {
+        String creatorName = creator != null ? creator.getName() : "Unknown";
+        String postContent = content != null ? content : "";
+        return "Post ID: " + postID + ", Creator: " + creatorName + ", Content: " + postContent;
     }
+
+    // Compares posts by their creation dates for sorting
+    @Override
+    public int compareTo(PostManager other) {
+        if (this == other) return 0;
+        if (other == null) return 1;
+        if (creationDate == null && other.creationDate == null) return 0;
+        if (creationDate == null) return -1;
+        if (other.creationDate == null) return 1;
+        return other.creationDate.compareTo(creationDate);
+    }
+
+    // Getter methods for table display properties
+    public SimpleStringProperty postIDProperty() { return postIDProperty; }
+    public SimpleStringProperty contentProperty() { return contentProperty; }
+    public SimpleStringProperty dateProperty() { return dateProperty; }
+    public SimpleStringProperty authorProperty() { return authorProperty; }
 } 

@@ -402,4 +402,56 @@ public class DataManagementUI {
         });
         return friendsColumn;
     }
+
+    private void showDataPreview() {
+        String previewText = "=== DATA PREVIEW ===\n\n";
+        
+        previewText += "Users:\n";
+        Iterator<UserManager> userIterator = userList.iterator();
+        while (userIterator.hasNext()) {
+            UserManager user = userIterator.next();
+            if (user != null) {
+                previewText += "- " + user.getName() + " (ID: " + user.getUserID() + ", Age: " + user.getAge() + ")\n";
+            }
+        }
+        
+        previewText += "\nPosts:\n";
+        Iterator<PostManager> postIterator = postList.iterator();
+        while (postIterator.hasNext()) {
+            PostManager post = postIterator.next();
+            if (post != null) {
+                String sharedWithUsers = "";
+                Iterator<UserManager> sharedIterator = post.getSharedUsers().iterator();
+                while (sharedIterator.hasNext()) {
+                    UserManager user = sharedIterator.next();
+                    if (user != null) {
+                        if (!sharedWithUsers.equals("")) {
+                            sharedWithUsers += ", ";
+                        }
+                        sharedWithUsers += user.getName();
+                    }
+                }
+                
+                String sharedWithText;
+                if (sharedWithUsers.equals("")) {
+                    sharedWithText = "None";
+                } else {
+                    sharedWithText = sharedWithUsers;
+                }
+                
+                previewText += "- " + post.getContent() + " by " + post.getCreator().getName() + 
+                              ", Shared With: " + sharedWithText + "\n";
+            }
+        }
+        
+        showAlert(Alert.AlertType.INFORMATION, "Data Preview", null, previewText);
+    }
+
+    private void showAlert(Alert.AlertType type, String title, String header, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(header);
+        alert.setContentText(content);
+        alert.showAndWait();
+    }
 } 

@@ -1,6 +1,7 @@
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -19,16 +20,20 @@ public class UserManagerUI {
     private CircularDoublyLinkedList<UserManager> users;
     private FileManager fileManager;
     private WelcomePage welcomePage;
-    private UserTableManager tableManager;
-    private UserDialogManager dialogManager;
+    private TableManager tableManager;
+    private DialogManager dialogManager;
     private ComboBox<String> sortOrderComboBox;
+    private TextField searchField;
+    private ComboBox<String> searchTypeComboBox;
 
     public UserManagerUI(CircularDoublyLinkedList<UserManager> users, FileManager fileManager, WelcomePage welcomePage) {
         this.users = users;
         this.fileManager = fileManager;
         this.welcomePage = welcomePage;
-        this.tableManager = new UserTableManager(users);
-        this.dialogManager = new UserDialogManager(users, tableManager);
+        this.tableManager = new TableManager(users, null);
+        this.dialogManager = new DialogManager(users, null, tableManager);
+        this.searchField = new TextField();
+        this.searchTypeComboBox = new ComboBox<>();
     }
 
     public Tab createUserTab() {
@@ -36,16 +41,13 @@ public class UserManagerUI {
         userContent.setPadding(new Insets(20));
         userContent.setAlignment(Pos.CENTER);
 
-        // Add search box
         HBox searchBox = createSearchBox();
 
-        // Get table from manager
-        TableView<UserManager> userTable = tableManager.getUserTable();
+        // Create the user table first
+        TableView<UserManager> userTable = tableManager.createUserTable();
 
-        // Navigate buttons
         HBox tableNavBox = createNavigationButtons();
 
-        // Action buttons
         HBox actionButtonsBox = createActionButtons();
 
         userContent.getChildren().addAll(searchBox, userTable, tableNavBox, actionButtonsBox);
@@ -59,20 +61,11 @@ public class UserManagerUI {
         HBox searchBox = new HBox(10);
         searchBox.setAlignment(Pos.CENTER);
         
-        ComboBox<String> searchTypeComboBox = new ComboBox<>();
         searchTypeComboBox.getItems().addAll("ID", "Name");
         searchTypeComboBox.setValue("Name");
         searchTypeComboBox.setPrefWidth(100);
         
-        TextField searchField = new TextField();
-        searchField.setPromptText("Enter search term");
-        searchField.setPrefWidth(200);
-        
-        Button searchButton = new Button("Search");
-        searchButton.setPrefWidth(100);
-        searchButton.setOnAction(e -> searchForUser(searchTypeComboBox.getValue(), searchField.getText()));
-        
-        searchBox.getChildren().addAll(new Label("Search by:"), searchTypeComboBox, searchField, searchButton);
+        searchBox.getChildren().addAll(new Label("Search by:"), searchTypeComboBox, searchField);
         return searchBox;
     }
 
@@ -119,34 +112,28 @@ public class UserManagerUI {
         return actionButtonsBox;
     }
 
-    private void searchForUser(String searchType, String searchTerm) {
-        if (searchTerm == null || searchTerm.trim().isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Warning", null, "Please enter a search term.");
+    private void handleUserSearch() {
+        String searchTerm = searchField.getText().trim();
+        if (searchTerm.isEmpty()) {
+            showAlert(Alert.AlertType.ERROR, "Error", null, "Please enter a search term");
             return;
         }
 
-        boolean searchById = "ID".equals(searchType);
+        boolean searchById = searchTerm.matches("\\d+");
         UserManager foundUser = tableManager.findUser(searchTerm, searchById);
 
-        if (foundUser == null) {
-            String message = searchById 
-                ? "No user found with ID: " + searchTerm 
-                : "No user found with name: " + searchTerm;
-            showAlert(Alert.AlertType.INFORMATION, "Search Result", null, message);
-            return;
+        if (foundUser != null) {
+            tableManager.getUserTable().getSelectionModel().select(foundUser);
+            tableManager.getUserTable().scrollTo(foundUser);
+        } else {
+            String errorMessage;
+            if (searchById) {
+                errorMessage = "No user found with ID: " + searchTerm;
+            } else {
+                errorMessage = "No user found with name: " + searchTerm;
+            }
+            showAlert(Alert.AlertType.ERROR, "Error", null, errorMessage);
         }
-
-        // Select the found user in the table
-        tableManager.getUserTable().getSelectionModel().select(foundUser);
-        tableManager.getUserTable().scrollTo(foundUser);
-        
-        // Show the user details
-        String details = "User Found:\n\n" +
-                         "ID: " + foundUser.getUserID() + "\n" +
-                         "Name: " + foundUser.getName() + "\n" +
-                         "Age: " + foundUser.getAge();
-        
-        showAlert(Alert.AlertType.INFORMATION, "Search Result", "User Found", details);
     }
 
     private void navigateToPreviousUser() {
@@ -157,7 +144,6 @@ public class UserManagerUI {
             table.getSelectionModel().select(currentIndex - 1);
             table.scrollTo(currentIndex - 1);
         } else if (currentIndex == -1 && !table.getItems().isEmpty()) {
-            // No selection, select the first item
             table.getSelectionModel().select(0);
             table.scrollTo(0);
         }
@@ -172,7 +158,6 @@ public class UserManagerUI {
             table.getSelectionModel().select(currentIndex + 1);
             table.scrollTo(currentIndex + 1);
         } else if (currentIndex == -1 && !table.getItems().isEmpty()) {
-            // No selection, select the first item
             table.getSelectionModel().select(0);
             table.scrollTo(0);
         }
@@ -190,6 +175,11 @@ public class UserManagerUI {
     }
 
     private void handleUserFileUpload() {
+        if (users == null) {
+            showAlert(Alert.AlertType.ERROR, "Error", null, "No users loaded - please load users first");
+            return;
+        }
+
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select User Data File");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text Files", "*.txt"));
@@ -197,7 +187,11 @@ public class UserManagerUI {
 
         if (selectedFile != null) {
             try {
-                fileManager.loadUsers(selectedFile.getAbsolutePath(), users);
+                CircularDoublyLinkedList<UserManager> loadedUsers = fileManager.loadUsers(selectedFile.getAbsolutePath());
+                Iterator<UserManager> iterator = loadedUsers.iterator();
+                while (iterator.hasNext()) {
+                    users.add(iterator.next());
+                }
                 
                 int duplicatesRemoved = removeDuplicateUsers();
                 
@@ -207,53 +201,41 @@ public class UserManagerUI {
                 if (duplicatesRemoved > 0) {
                     successMessage += "\nRemoved " + duplicatesRemoved + " duplicate user(s).";
                 }
-                
                 showAlert(Alert.AlertType.INFORMATION, "Success", null, successMessage);
             } catch (Exception e) {
-                showAlert(Alert.AlertType.ERROR, "Error", "Upload Failed", 
-                         "Error loading user data: " + e.getMessage());
+                showAlert(Alert.AlertType.ERROR, "Error", null, "Failed to load users: " + e.getMessage());
             }
         }
     }
     
-    private int removeDuplicateUsers() {
-        int duplicatesRemoved = 0;
-        
-        // Keep track of user IDs we've already seen
-        ArrayList<String> seenUserIds = new ArrayList<>();
-        ArrayList<UserManager> uniqueUsers = new ArrayList<>();
-        
-        // First collect all unique users (keeping only first occurrence of each ID)
+    public int removeDuplicateUsers() {
+        List<UserManager> uniqueUsers = new ArrayList<>();
         Iterator<UserManager> iterator = users.iterator();
         while (iterator.hasNext()) {
             UserManager user = iterator.next();
-            if (user != null) {
-                String userId = user.getUserID();
-                
-                if (!seenUserIds.contains(userId)) {
-                    // First time seeing this ID - keep it
-                    seenUserIds.add(userId);
-                    uniqueUsers.add(user);
-                } else {
-                    // This is a duplicate - don't keep it
-                    duplicatesRemoved++;
+            boolean isDuplicate = false;
+            for (int i = 0; i < uniqueUsers.size(); i++) {
+                if (uniqueUsers.get(i).getUserID().equals(user.getUserID())) {
+                    isDuplicate = true;
+                    break;
                 }
+            }
+            if (!isDuplicate) {
+                uniqueUsers.add(user);
             }
         }
         
-        // Clear the original list
+        int removedCount = users.size() - uniqueUsers.size();
         users.clear();
-        
-        // Rebuild the list with only unique users
-        for (UserManager user : uniqueUsers) {
-            users.insertLast(user);
+        for (int i = 0; i < uniqueUsers.size(); i++) {
+            users.insertLast(uniqueUsers.get(i));
         }
-        
-        return duplicatesRemoved;
+        tableManager.refreshUserTable(users);
+        return removedCount;
     }
 
     public void refreshUserTable() {
-        tableManager.refreshTable();
+        tableManager.refreshUserTable(users);
     }
 
     public TableView<UserManager> getUserTable() {

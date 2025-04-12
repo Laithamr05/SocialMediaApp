@@ -1,3 +1,8 @@
+// laith amro
+// 1230018
+// dr. mamoun nawahda
+// section 7
+
 import java.io.File;
 
 import javafx.geometry.Insets;
@@ -15,22 +20,35 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 
+// Manages the welcome page and navigation of the social network application
 public class WelcomePage {
+	// Main navigation container
 	private TabPane tabPane;
+	// Data structures for storing users and posts
 	private CircularDoublyLinkedList<UserManager> users;
 	private CircularDoublyLinkedList<PostManager> posts;
+	// Welcome page content container
+	private VBox welcomeContent;
 
+	// Creates a new welcome page with the given tab pane
 	public WelcomePage(TabPane tabPane) {
 		this.tabPane = tabPane;
 		this.users = new CircularDoublyLinkedList<>();
 		this.posts = new CircularDoublyLinkedList<>();
-	}
 
-	public VBox createWelcomePage() {
-		VBox welcomeContent = new VBox(20);
+		welcomeContent = new VBox(20);
 		welcomeContent.setPadding(new Insets(20));
 		welcomeContent.setAlignment(Pos.CENTER);
+	}
 
+	// Returns the welcome page content container
+	public VBox getWelcomeContent() {
+		return welcomeContent;
+	}
+
+	// Creates and returns the welcome page layout with logo and navigation buttons
+	public VBox createWelcomePage() {
+		// Load and display the application logo
 		ImageView logoView = new ImageView();
 		try {
 			Image logo = new Image(new File("src/PalestineSocial.png").toURI().toString());
@@ -42,12 +60,15 @@ public class WelcomePage {
 			// Error loading logo - silently ignored
 		}
 
+		// Create and style the welcome label
 		Label welcomeLabel = new Label("Welcome to Palestine Social Network");
 		welcomeLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
 
+		// Create a container for navigation buttons
 		HBox buttonBox = new HBox(10);
 		buttonBox.setAlignment(Pos.CENTER);
 		
+		// Create and configure the Users button
 		Button usersButton = new Button("Manage Users");
 		usersButton.setOnAction(e -> {
 			if (tabPane != null) {
@@ -55,6 +76,7 @@ public class WelcomePage {
 			}
 		});
 		
+		// Create and configure the Friendships button
 		Button friendsButton = new Button("Manage Friendships");
 		friendsButton.setOnAction(e -> {
 			if (tabPane != null) {
@@ -62,6 +84,7 @@ public class WelcomePage {
 			}
 		});
 		
+		// Create and configure the Posts button
 		Button postsButton = new Button("Manage Posts");
 		postsButton.setOnAction(e -> {
 			if (tabPane != null) {
@@ -69,6 +92,7 @@ public class WelcomePage {
 			}
 		});
 		
+		// Create and configure the Reports button
 		Button reportsButton = new Button("Reports & Statistics");
 		reportsButton.setOnAction(e -> {
 			if (tabPane != null) {
@@ -76,6 +100,7 @@ public class WelcomePage {
 			}
 		});
 		
+		// Create and configure the Data Management button
 		Button dataManagementButton = new Button("Data Management");
 		dataManagementButton.setOnAction(e -> {
 			if (tabPane != null) {
@@ -83,59 +108,36 @@ public class WelcomePage {
 			}
 		});
 		
+		// Add all buttons to the button container
 		buttonBox.getChildren().addAll(usersButton, friendsButton, postsButton, reportsButton, dataManagementButton);
 
+		// Add all components to the welcome page
 		welcomeContent.getChildren().addAll(logoView, welcomeLabel, buttonBox);
 
 		return welcomeContent;
 	}
 
+	// Sets the list of users
 	public void setUsers(CircularDoublyLinkedList<UserManager> users) {
 		this.users = users;
 	}
 
+	// Returns the list of users
 	public CircularDoublyLinkedList<UserManager> getUsers() {
 		return users;
 	}
 
+	// Sets the list of posts
 	public void setPosts(CircularDoublyLinkedList<PostManager> posts) {
 		this.posts = posts;
 	}
 
+	// Returns the list of posts
 	public CircularDoublyLinkedList<PostManager> getPosts() {
 		return posts;
 	}
 
-	public Tab createWelcomeTab() {
-		VBox welcomeContent = new VBox(30);
-		welcomeContent.setAlignment(Pos.CENTER);
-		welcomeContent.setPadding(new Insets(50, 20, 20, 20));
-		
-		try {
-			Image logo = new Image(getClass().getResourceAsStream("/PalestineSocial.png"));
-			ImageView logoView = new ImageView(logo);
-			logoView.setFitWidth(300);
-			logoView.setPreserveRatio(true);
-			
-			welcomeContent.getChildren().add(logoView);
-		} catch (Exception e) {
-			// Failed to load logo - silently ignored
-		}
-		
-		Text welcomeText = new Text("Welcome to Palestine Social Network");
-		welcomeText.setFont(Font.font("Arial", FontWeight.BOLD, 24));
-		welcomeText.setFill(Color.GREEN);
-		
-		Text instructionText = new Text("Please use the tabs above to navigate the application.");
-		instructionText.setFont(Font.font("Arial", 16));
-		
-		welcomeContent.getChildren().addAll(welcomeText, instructionText);
-		
-		Tab welcomeTab = new Tab("Welcome", welcomeContent);
-		welcomeTab.setClosable(false);
-		return welcomeTab;
-	}
-
+	// Returns the main tab pane
 	public TabPane getTabPane() {
 		return tabPane;
 	}

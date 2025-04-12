@@ -35,7 +35,7 @@ public class GUI extends Application {
 
 		// Initialize managers
 		dataLoadingManager = new DataLoadingManager(users, posts, fileManager);
-		
+
 		// Set up main layout
 		mainLayout = new BorderPane();
 		mainLayout.setPadding(new Insets(10));
@@ -50,7 +50,7 @@ public class GUI extends Application {
 		welcomePage.setPosts(posts);
 		userManagerUI = new UserManagerUI(users, fileManager, welcomePage);
 		postManagerUI = new PostManagerUI(posts, fileManager, users, welcomePage);
-		friendshipManagerUI = new FriendshipManagerUI(users, fileManager);
+		friendshipManagerUI = new FriendshipManagerUI(users, fileManager, welcomePage);
 		reportManagerUI = new ReportManagerUI(users, posts);
 		dataManagementUI = new DataManagementUI(users, posts, fileManager);
 		menuUIManager = new MenuUIManager(tabPane, users);
